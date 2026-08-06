@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "Production Starter Boilerplate Skeleton",
+  "version": "1.1.0",
+  "description": "Standardized application baseline pre-built with Auth, Profile, Layout, Sidebar, Navbar, Dashboard, and Auto DB Installer.",
+  "directory_structure": {
+    "bin": [
+      "setup.php (Automated Database Creation, Migration Runner, and Default Seeder)"
+    ],
+    "app": {
+      "Controllers": [
+        "AuthController.php (Login, Logout, Session Regen)",
+        "ProfileController.php (Edit Profile, Change Password, Avatar Upload)",
+        "DashboardController.php (KPI Cards, Recent Activity)",
+        "UserController.php (User & Role Management Baseline)"
+      ],
+      "Services": [
+        "AuthService.php (Bcrypt Check, Session Management, Audit Log)",
+        "ProfileService.php (Profile Update, Password Hashing, Avatar Storage)",
+        "AuditService.php (Logging CUD & Auth Events)"
+      ],
+      "Requests": [
+        "LoginRequest.php",
+        "UpdateProfileRequest.php",
+        "ChangePasswordRequest.php"
+      ],
+      "Models": [
+        "User.php (SoftDeletes, Hidden Password, Scopes)",
+        "Role.php",
+        "Permission.php",
+        "AuditLog.php"
+      ],
+      "Middleware": [
+        "AuthMiddleware.php",
+        "RbacMiddleware.php",
+        "CsrfMiddleware.php (Must inject Slim/Csrf/Guard tokens into Twig globals)",
+        "RateLimitMiddleware.php"
+      ]
+    },
+    "resources": {
+      "views": {
+        "layouts": [
+          "base.twig (Master Layout + AppLoader + Toasts)",
+          "auth.twig (Centered Clean Layout for Login)"
+        ],
+        "partials": [
+          "navbar.twig (User Avatar, Profile Dropdown, Logout Button, Theme Toggle)",
+          "sidebar.twig (Collapsible Accordion Navigation with RBAC {% if can() %})",
+          "breadcrumb.twig (Dynamic Trail Navigation)",
+          "flash.twig (SweetAlert2 Toast Handler)"
+        ],
+        "auth": [
+          "login.twig (Clean Modern Card, CSRF Token, Loading Feedback)"
+        ],
+        "profile": [
+          "index.twig (Profile Details & Avatar Upload)",
+          "password.twig (Security & Password Reset)"
+        ],
+        "dashboard": [
+          "index.twig (Modern Glassmorphism KPI Summary Cards & Activity Table)"
+        ]
+      }
+    },
+    "public": {
+      "assets": {
+        "vendor": {
+          "fonts": "Inter woff2 files (No CDN)",
+          "css": "tailwind.min.css, flowbite.min.css, sweetalert2.min.css, choices.min.css, flatpickr.min.css",
+          "js": "axios.min.js, sweetalert2.all.min.js, choices.min.js, flatpickr.min.js, app.js"
+        }
+      }
+    }
+  },
+  "prebuilt_core_features": {
+    "0_auto_db_installer": {
+      "file": "bin/setup.php",
+      "features": [
+        "Automatic CREATE DATABASE IF NOT EXISTS based on .env config",
+        "Sequential migration execution from database/migrations/*.sql",
+        "Automatic seed of default Roles, Permissions, and Superadmin user (username: admin, password: admin)"
+      ]
+    },
+    "1_layout_system": {
+      "components": [
+        "Responsive Collapsible Sidebar (Mobile Drawer | Tablet Icons | Desktop Full)",
+        "Top Navbar with Profile Avatar & Logout Modal Confirmation",
+        "Dynamic Breadcrumb Navigation",
+        "Page Progress Loader Bar & Axios Global Interceptors",
+        "Responsive Table Wrapper (<div class=\"overflow-x-auto w-full\">)"
+      ]
+    },
+    "2_authentication_module": {
+      "endpoints": ["GET /login", "POST /login", "POST /logout"],
+      "security_features": [
+        "Rate limiting (Max 5 attempts / 15 mins)",
+        "session_regenerate_id(true) on login",
+        "Generic auth error message ('Username atau password salah')",
+        "CSRF Token validation on form & Axios",
+        "AuditLog record on Login / Logout"
+      ]
+    },
+    "3_profile_management": {
+      "endpoints": [
+        "GET /profile",
+        "POST /profile",
+        "GET /profile/password",
+        "POST /profile/password"
+      ],
+      "features": [
+        "Name, Username, Phone Profile Editing",
+        "Secure Avatar Upload (MIME validation, Extension Whitelist, Random Hex Renaming)",
+        "Password Change with Current Password verification & Bcrypt hashing"
+      ]
+    },
+    "4_dashboard_baseline": {
+      "endpoints": ["GET /dashboard"],
+      "components": [
+        "4 KPI Metric Cards (Total Users, Active Sessions, System Status, Quick Actions)",
+        "Recent Activity Audit Table"
+      ]
+    }
+  },
+  "index_php_strict_rules": {
+    "session_handling": "Always start session using `$container->get(\\Odan\\Session\\SessionInterface::class)->start();` before adding middleware. NEVER use raw `session_start();`.",
+    "middleware_execution_order": "To avoid CSRF parsing bugs, middleware MUST be added in this exact order (which executes them correctly in LIFO): 1) CsrfMiddleware, 2) Slim\\Csrf\\Guard, 3) RoutingMiddleware, 4) BodyParsingMiddleware, 5) ErrorMiddleware."
+  },
+  "boilerplate_init_command": {
+    "description": "How AI initializes a new project starter skeleton",
+    "rule": "When starting a NEW project, AI automatically generates the core directory structure, bin/setup.php, and prebuilt Auth, Profile, Layout, Navbar, and Dashboard files. AI MUST ALSO create and run a script (e.g., bin/download_assets.php) to download all required frontend libraries (Tailwind, SweetAlert, Axios, etc.) into public/assets/vendor/ to strictly comply with the NO-CDN policy."
+  }
+}

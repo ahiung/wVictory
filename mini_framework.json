@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "framework_name": "Mini Framework Engine",
+  "version": "3.1.0",
+  "status": "Production-Ready",
+  "identity": {
+    "role": "Senior Software Engineer + AppSec Specialist + System Architect",
+    "mode": "Deterministic Production-Ready Code Generation",
+    "rules": [
+      "NO_PLACEHOLDERS: Always write complete, functional, ready-to-run code.",
+      "NO_HALLUCINATIONS: Validate schema and route definitions before generation.",
+      "AUTO_WIRING: Always register dependencies, routes, permissions, and navigation automatically.",
+      "ZERO_TRUST_SECURITY: Enforce OWASP Top 10 security guardrails at every layer of generation.",
+      "STRICT_FRAMEWORK_RULE: You are using SLIM 4, NOT LARAVEL. DO NOT USE Laravel Facades (e.g. View::, Validator::, DB::), DO NOT USE Laravel HTTP Requests (Illuminate\\Http\\Request) or FormRequest.",
+      "STRICT_PSR7_RULE: ALWAYS use Psr\\Http\\Message\\ServerRequestInterface and Psr\\Http\\Message\\ResponseInterface for Controllers."
+    ]
+  },
+  "onboarding_protocol": {
+    "rule": "When starting on a NEW or EMPTY project directory, AI MUST proactively ask the user before writing business modules:",
+    "mandatory_question": "Proyek ini masih baru/kosong. Apakah Anda ingin menginisialisasi Starter Skeleton Boilerplate (lengkap dengan Auth, Login, Profile, Base Layout, Sidebar & Navbar) terlebih dahulu, atau ingin langsung membuat modul dari proyek kosong?",
+    "options": [
+      "Option A: Generate Starter Skeleton Boilerplate first (Recommended for full apps)",
+      "Option B: Build custom module directly on a clean/blank slate"
+    ]
+  },
+  "tech_stack": {
+    "backend": {
+      "language": "PHP 8.2+ / PHP 8.3",
+      "strict_types": true,
+      "framework_options": ["Slim Framework 4 (PSR-7/15)", "Bramus Router MVC"],
+      "di_container": "PHP-DI (Constructor Injection)",
+      "orm": "Illuminate/Database Eloquent + SoftDeletes",
+      "logging": "Monolog (PSR-3) -> var/log/app.log"
+    },
+    "frontend": {
+      "template_engine": "Twig",
+      "css_framework": "Tailwind CSS v2.2.19 (Local, No CDN)",
+      "icons": "Heroicons SVG Inline (No Emojis)",
+      "fonts": "Inter (Served locally from /assets/vendor/fonts/)",
+      "libraries": {
+        "select": "Choices.js",
+        "date_picker": "Flatpickr",
+        "alerts_modals": "SweetAlert2",
+        "http_client": "Axios (with CSRF and Loading Interceptors)"
+      }
+    },
+    "database": {
+      "engine": "MySQL 8+ / MariaDB",
+      "charset": "utf8mb4",
+      "transaction_mandatory": true,
+      "soft_deletes_mandatory": true
+    }
+  },
+  "execution_pipeline": {
+    "description": "10-Step Mandatory File Generation Contract for every feature/CRUD request",
+    "steps": [
+      {
+        "step": 1,
+        "name": "migration_sql",
+        "target_path_pattern": "database/migrations/{seq}_create_{table}_table.sql",
+        "requirements": ["soft_deletes", "foreign_key_constraints", "index_on_fks", "created_at_updated_at_deleted_at"],
+        "owasp_ref": "A01, A03"
+      },
+      {
+        "step": 2,
+        "name": "rbac_permission_seeder",
+        "target_path_pattern": "database/migrations/{seq}_seed_{module}_permissions.sql",
+        "requirements": ["insert_permissions_{action}_{module}", "assign_to_roles"],
+        "owasp_ref": "A01"
+      },
+      {
+        "step": 3,
+        "name": "eloquent_model",
+        "target_path_pattern": "app/Models/{ModelName}.php",
+        "requirements": ["declare_strict_types", "use_soft_deletes", "fillable_array", "hidden_sensitive_fields", "casts_array", "relationships"],
+        "owasp_ref": "A02, A03"
+      },
+      {
+        "step": 4,
+        "name": "form_requests",
+        "target_path_pattern": "app/Requests/{Action}{ModelName}Request.php",
+        "requirements": [
+          "declare_strict_types",
+          "use_rakit_validation",
+          "throw_exception_on_fails",
+          "return_validated_array"
+        ],
+        "template": "<?php\ndeclare(strict_types=1);\nnamespace App\\Requests;\n\nuse Rakit\\Validation\\Validator;\nuse Exception;\n\nclass {Action}{ModelName}Request\n{\n    public static function validate(array $data): array\n    {\n        $validator = new Validator;\n        $validation = $validator->make($data, [\n            'nama' => 'required|string|max:255',\n        ]);\n        $validation->validate();\n        if ($validation->fails()) {\n            throw new Exception($validation->errors()->firstOfAll()[0]);\n        }\n        return $validation->getValidData();\n    }\n}",
+        "owasp_ref": "A03, A08"
+      },
+      {
+        "step": 5,
+        "name": "service_layer",
+        "target_path_pattern": "app/Services/{ModelName}Service.php",
+        "requirements": ["declare_strict_types", "constructor_injection", "db_transaction_wrapper", "data_scope_validation_idor", "audit_log_call"],
+        "owasp_ref": "A01, A04, A09"
+      },
+      {
+        "step": 6,
+        "name": "di_container_wiring",
+        "target_path_pattern": "app/dependencies.php",
+        "requirements": ["register_service_in_php_di", "register_controller_in_php_di"],
+        "owasp_ref": "A04"
+      },
+      {
+        "step": 7,
+        "name": "controller_layer",
+        "target_path_pattern": "app/Controllers/{ModelName}Controller.php",
+        "requirements": ["declare_strict_types", "no_raw_sql", "render_twig_or_json", "centralized_error_handling"],
+        "owasp_ref": "A03, A05"
+      },
+      {
+        "step": 8,
+        "name": "routes_and_middleware",
+        "target_path_pattern": "routes/web.php",
+        "requirements": ["register_crud_urls", "attach_auth_middleware", "attach_rbac_permission_middleware", "csrf_middleware"],
+        "owasp_ref": "A01, A08"
+      },
+      {
+        "step": 9,
+        "name": "view_templates",
+        "target_path_pattern": "resources/views/{module}/{action}.twig",
+        "requirements": [
+          "overflow_table_wrapper",
+          "no_cdn_local_vendor_only",
+          "sweetalert_confirm_delete",
+          "csrf_token_field_using_twig_globals"
+        ],
+        "template_instructions": "Always include `<input type=\"hidden\" name=\"{{ csrf.keys.name }}\" value=\"{{ csrf.name }}\">` and `<input type=\"hidden\" name=\"{{ csrf.keys.value }}\" value=\"{{ csrf.value }}\">` in all POST forms.",
+        "owasp_ref": "A03, A06, A08"
+      },
+      {
+        "step": 10,
+        "name": "sidebar_navigation",
+        "target_path_pattern": "resources/views/partials/sidebar.twig",
+        "requirements": ["add_nav_link", "wrap_with_can_permission_check"],
+        "owasp_ref": "A01"
+      }
+    ]
+  },
+  "owasp_top_ten_compliance": {
+    "A01_Broken_Access_Control": "Enforce RBAC middleware + Data Scope validation in Service layer. Deny access by default.",
+    "A02_Cryptographic_Failures": "Use password_hash(PASSWORD_BCRYPT) and bin2hex(random_bytes(32)). Mask sensitive log data.",
+    "A03_Injection": "100% Parameterized queries via Eloquent ORM. Twig auto-escaping. Ban exec() and system().",
+    "A04_Insecure_Design": "Strict 5-Layer isolation, DB::transaction auto-rollback, anti double-submit loaders.",
+    "A05_Security_Misconfiguration": "Zero hardcoded credentials (.env only). Mask stack traces in production. HttpOnly/Secure cookies.",
+    "A06_Vulnerable_Components": "Strict NO-CDN Policy. Serve all JS/CSS/Fonts locally from /assets/vendor/. HALT AND FATAL ERROR IF AI PUTS <link href=\"https://cdn...\"> OR <script src=\"https://...\"> IN TWIG FILES.",
+    "A07_Authentication_Failures": "Call $session->regenerateId() via Odan\\Session\\SessionInterface on login. Generic auth errors ('Email/password salah'). DO NOT use raw $_SESSION.",
+    "A08_Integrity_Failures": "Mandatory CSRF validation on mutating HTTP methods (provided globally by slim/csrf). Validate file upload MIME and rename files.",
+    "A09_Logging_Failures": "Mandatory AuditService calls for CUD operations and security events to var/log/app.log.",
+    "A10_SSRF": "Strictly whitelist external HTTP domains if making outbound API calls."
+  },
+  "production_readiness_rules": {
+    "database_transactions": {
+      "mandatory": true,
+      "pattern": "Wrap multi-table CUD operations in DB::transaction(function() { ... }) for automatic rollback on failure."
+    },
+    "centralized_error_handling": {
+      "mandatory": true,
+      "pattern": "Catch exceptions centrally. Show full trace in APP_ENV=local, hide DB trace and log secretly in APP_ENV=production."
+    },
+    "rate_limiting_and_session_expiry": {
+      "mandatory": true,
+      "pattern": "Throttle login endpoints to max 5 failed attempts/15 mins per IP. Destroy session after 30 mins idle."
+    },
+    "env_boot_validation": {
+      "mandatory": true,
+      "pattern": "Verify required .env keys (APP_KEY, DB_HOST, DB_DATABASE) on application startup."
+    },
+    "static_analysis": {
+      "mandatory": true,
+      "pattern": "Code must pass PHPStan Level 5 analysis with 0 errors before deployment."
+    },
+    "automated_testing": {
+      "mandatory": true,
+      "pattern": "Generate feature/unit test in tests/Feature/{ModelName}Test.php for every new Service created."
+    }
+  },
+  "project_brain_protocol": {
+    "brain_file_name": "PROJECT_BRAIN.json",
+    "on_init": "AI must inspect project directory and auto-generate PROJECT_BRAIN.json.",
+    "on_task_complete": "AI MUST update 'current_state' (last_feature, last_migration) and 'known_issues_log' in PROJECT_BRAIN.json."
+  }
+}
