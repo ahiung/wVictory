@@ -2,7 +2,7 @@
 
 > 🚨 **ABSOLUTE MANDATORY RULE FOR ALL AI ASSISTANTS**:
 > 
-> 1. **Framework Engine**: Read `.agents/mini_framework.json` and `.agents/starter_boilerplate_blueprint.json` automatically on every task.
+> 1. **Framework Engine**: Read `mini_framework.json` and `starter_boilerplate_blueprint.json` (project root) automatically on every task.
 > 2. **Execution Pipeline**: Always follow the 10-Step Mandatory Execution Pipeline for feature requests.
 > 3. **OWASP Top 10 Security**: Enforce OWASP Top 10 Security Guardrails (Data Scope validation, CSRF, Strict Type casting, SoftDeletes, No-CDN).
 > 4. 🧠 **AUTOMATIC BRAIN EVOLVE (CRITICAL)**:

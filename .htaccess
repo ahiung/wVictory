@@ -1,0 +1,13 @@
+# Project root .htaccess — forwards every request into the public/ front-controller
+# directory so the document root can stay at the repo root instead of public/.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^$ public/ [L]
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule (.*) public/$1 [L]
+</IfModule>
+
+# Never serve dotfiles or the framework config/spec files directly.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>

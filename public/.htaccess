@@ -1,0 +1,17 @@
+# Slim 4 front-controller rewrite rules.
+RewriteEngine On
+
+# If the requested filename/directory exists as-is (real asset), serve it directly.
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [QSA,L]
+
+# Security headers.
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Never allow directory listing.
+Options -Indexes

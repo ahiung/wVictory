@@ -64,9 +64,10 @@
     "public": {
       "assets": {
         "vendor": {
-          "fonts": "Inter woff2 files (No CDN)",
-          "css": "tailwind.min.css, flowbite.min.css, sweetalert2.min.css, choices.min.css, flatpickr.min.css",
-          "js": "axios.min.js, sweetalert2.all.min.js, choices.min.js, flatpickr.min.js, app.js"
+          "status": "PRE-PROVISIONED — these files already exist in public/assets/vendor/. AI must NEVER attempt to download, fetch, or regenerate them; only reference them via local <link>/<script> tags.",
+          "fonts": "public/assets/vendor/fonts/Inter-Variable.woff2 (variable font, weights 100-900)",
+          "css": "public/assets/vendor/css/{tailwind.min.css, flowbite.min.css, sweetalert2.min.css, choices.min.css, flatpickr.min.css, fonts.css}",
+          "js": "public/assets/vendor/js/{axios.min.js, sweetalert2.all.min.js, choices.min.js, flatpickr.min.js, flowbite.min.js, app.js}"
         }
       }
     }
@@ -77,7 +78,7 @@
       "features": [
         "Automatic CREATE DATABASE IF NOT EXISTS based on .env config",
         "Sequential migration execution from database/migrations/*.sql",
-        "Automatic seed of default Roles, Permissions, and Superadmin user (username: admin, password: admin)"
+        "Automatic seed of default Roles, Permissions, and Superadmin user (username: admin, password: randomly generated via bin2hex(random_bytes(6)) at install time, printed once to console/setup log — NEVER hardcoded as 'admin'. Seeded user gets must_change_password=1, enforced by AuthMiddleware redirecting to /profile/password until changed.)"
       ]
     },
     "1_layout_system": {

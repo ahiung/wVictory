@@ -190,7 +190,10 @@ Digunakan untuk halaman indeks/tabel data pada setiap modul CRUD (seperti Master
                         <div class="flex items-center justify-center gap-3">
                             <a href="#" class="text-gray-400 hover:text-green-700" title="Detail"><svg class="w-4 h-4">...</svg></a>
                             <a href="#" class="text-gray-400 hover:text-blue-600" title="Edit"><svg class="w-4 h-4">...</svg></a>
-                            <form action="#" method="POST" class="inline" onsubmit="return confirm('Hapus data?');">
+                            <!-- JANGAN pakai onsubmit="confirm(...)" native — requirement step 9 (sweetalert_confirm_delete) wajib pakai SweetAlert2 via app.js. Kelas js-confirm-delete di-intercept otomatis oleh app.js. -->
+                            <form action="#" method="POST" class="inline js-confirm-delete" data-confirm-title="Hapus data?" data-confirm-text="Data yang dihapus tidak dapat dikembalikan.">
+                                <input type="hidden" name="{{ csrf.keys.name }}" value="{{ csrf.name }}">
+                                <input type="hidden" name="{{ csrf.keys.value }}" value="{{ csrf.value }}">
                                 <button type="submit" class="text-gray-400 hover:text-red-600" title="Hapus"><svg class="w-4 h-4">...</svg></button>
                             </form>
                         </div>
@@ -218,7 +221,7 @@ Sistem basis kita otomatis menginisialisasi pustaka UI modern dengan hanya menye
 
 - **Tanggal (Flatpickr)**: Tambahkan kelas `datepicker` pada input.
   `<input type="text" name="tgl_lahir" class="datepicker w-full rounded-lg border-gray-300 ...">`
-- **Dropdown Pencarian (Choices.js / Pengganti Select2)**: Tambahkan kelas `select2` pada tag `<select>`.
-  `<select name="kategori_id" class="select2"><option>...</option></select>`
+- **Dropdown Pencarian (Choices.js)**: Tambahkan kelas `data-choices` pada tag `<select>`. **JANGAN** pakai nama kelas `select2` — library asli di sini adalah **Choices.js** (`new Choices(el)`), BUKAN jQuery Select2 (`$(...).select2()`). Kedua API tidak kompatibel.
+  `<select name="kategori_id" class="data-choices"><option>...</option></select>`
 - **Loading Overlay**: Otomatis muncul (membekukan layar) setiap kali formulir di-*submit* (`<form method="POST">`). Jika Anda ingin membuat form pencarian GET (misal di halaman index) yang TIDAK perlu memunculkan loading bar saat di-enter, tambahkan atribut `data-no-loader` pada tag form:
   `<form method="GET" data-no-loader>`

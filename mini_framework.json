@@ -27,7 +27,7 @@
     "backend": {
       "language": "PHP 8.2+ / PHP 8.3",
       "strict_types": true,
-      "framework_options": ["Slim Framework 4 (PSR-7/15)", "Bramus Router MVC"],
+      "framework": "Slim Framework 4 (PSR-7/15) ONLY. Do NOT use Bramus Router or any other routing library — routes are always defined via $app->get()/post()/etc. on the Slim App instance.",
       "di_container": "PHP-DI (Constructor Injection)",
       "orm": "Illuminate/Database Eloquent + SoftDeletes",
       "logging": "Monolog (PSR-3) -> var/log/app.log"
@@ -38,10 +38,11 @@
       "icons": "Heroicons SVG Inline (No Emojis)",
       "fonts": "Inter (Served locally from /assets/vendor/fonts/)",
       "libraries": {
-        "select": "Choices.js",
+        "select": "Choices.js (trigger class: `data-choices`, NOT `select2` — do not confuse with jQuery Select2)",
         "date_picker": "Flatpickr",
         "alerts_modals": "SweetAlert2",
-        "http_client": "Axios (with CSRF and Loading Interceptors)"
+        "http_client": "Axios (with CSRF and Loading Interceptors)",
+        "ui_components": "Flowbite (dropdowns, modals, tooltips built on Tailwind)"
       }
     },
     "database": {
@@ -49,6 +50,28 @@
       "charset": "utf8mb4",
       "transaction_mandatory": true,
       "soft_deletes_mandatory": true
+    }
+  },
+  "canonical_snippets": {
+    "description": "Literal, copy-paste-ready code that MUST be reused verbatim (only rename Model/Table/fields) instead of being regenerated from scratch. These exist because a 7B-class model is prone to hallucinating APIs for standalone/niche libraries — always prefer these over inventing new code.",
+    "eloquent_capsule_bootstrap": {
+      "target_path": "app/bootstrap.php, required from public/index.php BEFORE the Slim App/DI container is built",
+      "code": "<?php\ndeclare(strict_types=1);\n\nuse Illuminate\\Database\\Capsule\\Manager as Capsule;\n\n$capsule = new Capsule;\n$capsule->addConnection([\n    'driver'    => 'mysql',\n    'host'      => $_ENV['DB_HOST'],\n    'database'  => $_ENV['DB_DATABASE'],\n    'username'  => $_ENV['DB_USERNAME'],\n    'password'  => $_ENV['DB_PASSWORD'],\n    'charset'   => 'utf8mb4',\n    'collation' => 'utf8mb4_unicode_ci',\n    'prefix'    => '',\n]);\n\n$capsule->setAsGlobal();\n$capsule->bootEloquent();"
+    },
+    "twig_custom_extensions": {
+      "target_path": "app/dependencies.php, registered on the Twig environment right after Twig::create()",
+      "note": "REQUIRED because views use `|initials` filter and `can()` function — without this registration Twig throws Twig\\Error\\SyntaxError at runtime.",
+      "code": "$twig->getEnvironment()->addFilter(new \\Twig\\TwigFilter('initials', function (?string $name): string {\n    if (!$name) return '?';\n    $words = preg_split('/\\s+/', trim($name));\n    $initials = array_map(fn($w) => mb_strtoupper(mb_substr($w, 0, 1)), array_slice($words, 0, 2));\n    return implode('', $initials);\n}));\n\n$twig->getEnvironment()->addFunction(new \\Twig\\TwigFunction('can', function (string $permission) use ($session): bool {\n    $permissions = $session->get('permissions', []);\n    return in_array($permission, $permissions, true);\n}));"
+    },
+    "controller_twig_render": {
+      "used_in_step": 7,
+      "note": "The ONLY correct way to render a view from a Controller. Never use Laravel's view() helper.",
+      "code": "<?php\ndeclare(strict_types=1);\n\nnamespace App\\Controllers;\n\nuse Psr\\Http\\Message\\ServerRequestInterface as Request;\nuse Psr\\Http\\Message\\ResponseInterface as Response;\nuse Slim\\Views\\Twig;\n\nclass ExampleController\n{\n    public function index(Request $request, Response $response): Response\n    {\n        $view = Twig::fromRequest($request);\n        return $view->render($response, 'module/index.twig', [\n            'module_title' => 'Contoh',\n        ]);\n    }\n}"
+    },
+    "csrf_twig_globals_middleware": {
+      "target_path": "app/Middleware/CsrfViewMiddleware.php, registered AFTER Slim\\Csrf\\Guard so csrf attributes already exist on the request",
+      "note": "Variable names here (csrf.keys.name, csrf.name, csrf.keys.value, csrf.value) MUST exactly match what step 9 view templates read. This is the single source of truth for both sides.",
+      "code": "public function process(Request $request, RequestHandlerInterface $handler): Response\n{\n    $view = Twig::fromRequest($request);\n    $view->getEnvironment()->addGlobal('csrf', [\n        'keys' => [\n            'name'  => $request->getAttribute('csrf_name_key'),\n            'value' => $request->getAttribute('csrf_value_key'),\n        ],\n        'name'  => $request->getAttribute('csrf_name'),\n        'value' => $request->getAttribute('csrf_value'),\n    ]);\n    return $handler->handle($request);\n}"
     }
   },
   "execution_pipeline": {
@@ -99,14 +122,14 @@
         "step": 6,
         "name": "di_container_wiring",
         "target_path_pattern": "app/dependencies.php",
-        "requirements": ["register_service_in_php_di", "register_controller_in_php_di"],
+        "requirements": ["register_service_in_php_di", "register_controller_in_php_di", "register_twig_custom_extensions (see canonical_snippets.twig_custom_extensions)"],
         "owasp_ref": "A04"
       },
       {
         "step": 7,
         "name": "controller_layer",
         "target_path_pattern": "app/Controllers/{ModelName}Controller.php",
-        "requirements": ["declare_strict_types", "no_raw_sql", "render_twig_or_json", "centralized_error_handling"],
+        "requirements": ["declare_strict_types", "no_raw_sql", "render_twig_or_json (see canonical_snippets.controller_twig_render)", "centralized_error_handling"],
         "owasp_ref": "A03, A05"
       },
       {
@@ -126,7 +149,7 @@
           "sweetalert_confirm_delete",
           "csrf_token_field_using_twig_globals"
         ],
-        "template_instructions": "Always include `<input type=\"hidden\" name=\"{{ csrf.keys.name }}\" value=\"{{ csrf.name }}\">` and `<input type=\"hidden\" name=\"{{ csrf.keys.value }}\" value=\"{{ csrf.value }}\">` in all POST forms.",
+        "template_instructions": "Always include `<input type=\"hidden\" name=\"{{ csrf.keys.name }}\" value=\"{{ csrf.name }}\">` and `<input type=\"hidden\" name=\"{{ csrf.keys.value }}\" value=\"{{ csrf.value }}\">` in all POST forms. Delete actions MUST use the `js-confirm-delete` form class (handled by public/assets/vendor/js/app.js via SweetAlert2) instead of native `onsubmit=\"confirm(...)\"`. base.twig MUST also render `<meta name=\"csrf-name\" content=\"{{ csrf.name }}\">` and `<meta name=\"csrf-value\" content=\"{{ csrf.value }}\">` in <head>, plus a `<div id=\"app-loader\" class=\"hidden fixed inset-0 z-50 ...\">` element — both are read by app.js for the Axios CSRF header and the global loading overlay.",
         "owasp_ref": "A03, A06, A08"
       },
       {
@@ -178,7 +201,25 @@
   },
   "project_brain_protocol": {
     "brain_file_name": "PROJECT_BRAIN.json",
-    "on_init": "AI must inspect project directory and auto-generate PROJECT_BRAIN.json.",
-    "on_task_complete": "AI MUST update 'current_state' (last_feature, last_migration) and 'known_issues_log' in PROJECT_BRAIN.json."
+    "on_init": "AI must inspect project directory and auto-generate PROJECT_BRAIN.json using the exact schema in 'schema_example' below. NEVER invent a different structure — a small model that reinvents the schema each session breaks continuity.",
+    "on_task_complete": "AI MUST update 'current_state' (last_feature, last_migration) and 'known_issues_log' in PROJECT_BRAIN.json.",
+    "schema_example": {
+      "project_name": "string",
+      "framework_version": "3.1.0",
+      "current_state": {
+        "last_feature": "e.g. barang_masuk_crud",
+        "last_migration": "e.g. 0007_create_barang_masuk_table.sql",
+        "last_updated": "ISO-8601 timestamp"
+      },
+      "modules_completed": ["auth", "profile", "dashboard"],
+      "known_issues_log": [
+        {
+          "date": "ISO-8601 timestamp",
+          "module": "string",
+          "issue": "short description",
+          "status": "open | resolved"
+        }
+      ]
+    }
   }
 }
