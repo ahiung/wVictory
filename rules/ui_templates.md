@@ -54,14 +54,16 @@ Navbar berisi Logo di kiri dan Avatar Inisial (menggunakan *filter* Twig `initia
 ```
 
 ## 3. Sidebar (`sidebar.twig`) — GENERIC RENDERER, JANGAN DIEDIT PER MODUL
-Sidebar **BUKAN** file yang diedit setiap ada modul baru. Ia adalah renderer generik yang loop atas Twig global `menu` (dibangun oleh `App\Support\MenuBuilder` dari `app/menu.php`, di-inject di `AuthMiddleware`). Menu *accordion* (seperti Sistem Otorisasi) otomatis muncul kalau item punya `children`, memakai elemen `<details>`/`<summary>` bawaan HTML5.
+Referensi struktur: **Flowbite Admin Dashboard** (github.com/themesberg/flowbite-admin-dashboard) — lihat `mini_framework.json` → `design_system`. Warna brand tetap `green-800` kita, bukan skema abu-abu default mereka.
+
+Sidebar **BUKAN** file yang diedit setiap ada modul baru. Ia adalah renderer generik yang loop atas Twig global `menu` (dibangun oleh `App\Support\MenuBuilder` dari `app/menu.php`, di-inject di `AuthMiddleware`). Menu *accordion* (seperti Sistem Otorisasi) otomatis muncul kalau item punya `children`, memakai mekanisme collapse **native Flowbite** (`data-collapse-toggle`, dari `flowbite.min.js` yang sudah dimuat) — **BUKAN** `<details>`/`<summary>` HTML5 (pola versi sebelumnya, sudah usang).
 
 **Untuk menambah link nav modul baru: tambahkan SATU entri array di `app/menu.php` (lihat `mini_framework.json` → `canonical_snippets.menu_registry_pattern.menu_php_template`). JANGAN PERNAH edit HTML di `sidebar.twig` untuk ini** — satu-satunya bagian `sidebar.twig` yang boleh disentuh modul baru adalah menambah key baru ke dict `icons` di baris atas, kalau butuh ikon yang belum ada.
 
 ```html
 <style>
-    details > summary { list-style: none; }
-    details > summary::-webkit-details-marker { display: none; }
+    /* Flowbite hanya toggle class "hidden" + aria-expanded, rotasi chevron ditangani CSS murni di sini */
+    [data-collapse-toggle][aria-expanded="true"] .chevron { transform: rotate(180deg); }
 </style>
 {% set icons = {
     'dashboard': '<svg ...>...</svg>',
@@ -71,20 +73,18 @@ Sidebar **BUKAN** file yang diedit setiap ada modul baru. Ia adalah renderer gen
     <nav class="flex-1 px-3 space-y-1.5">
         {% for item in menu %}
             {% if item.children is defined and item.children|length > 0 %}
-            <details class="group">
-                <summary class="flex items-center justify-between cursor-pointer px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-green-800 rounded-lg">
-                    <div class="flex items-center gap-3">
-                        {% if item.icon and icons[item.icon] is defined %}{{ icons[item.icon]|raw }}{% endif %}
-                        <span>{{ item.label }}</span>
-                    </div>
-                    <svg class="w-4 h-4 text-gray-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                </summary>
-                <div class="mt-1 space-y-1">
-                    {% for child in item.children %}
-                    <a href="{{ child.route }}" class="flex items-center gap-3 pl-11 pr-3 py-2 text-sm font-medium text-gray-600 hover:text-green-800 hover:bg-gray-50 rounded-lg">{{ child.label }}</a>
-                    {% endfor %}
-                </div>
-            </details>
+            <button type="button" class="flex items-center justify-between w-full px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-green-800 rounded-lg" data-collapse-toggle="menu-{{ item.id }}" aria-controls="menu-{{ item.id }}" aria-expanded="false">
+                <span class="flex items-center gap-3">
+                    {% if item.icon and icons[item.icon] is defined %}{{ icons[item.icon]|raw }}{% endif %}
+                    <span>{{ item.label }}</span>
+                </span>
+                <svg class="chevron w-4 h-4 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            <ul id="menu-{{ item.id }}" class="hidden mt-1 space-y-1">
+                {% for child in item.children %}
+                <li><a href="{{ child.route }}" class="flex items-center gap-3 pl-11 pr-3 py-2 text-sm font-medium text-gray-600 hover:text-green-800 hover:bg-gray-50 rounded-lg">{{ child.label }}</a></li>
+                {% endfor %}
+            </ul>
             {% else %}
             <a href="{{ item.route }}" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 hover:text-green-800">
                 {% if item.icon and icons[item.icon] is defined %}{{ icons[item.icon]|raw }}{% endif %}

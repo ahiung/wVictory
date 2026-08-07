@@ -58,6 +58,27 @@
       "soft_deletes_mandatory": true
     }
   },
+  "design_system": {
+    "description": "Structural/visual reference for every Twig template. Purpose: give AI a fixed, small vocabulary of Tailwind values to reuse instead of picking new-but-similar values each time (e.g. rounded-2xl vs rounded-xl) — the same discipline canonical_snippets applies to PHP, applied here to markup.",
+    "reference_template": "Flowbite Admin Dashboard (github.com/themesberg/flowbite-admin-dashboard) — HTML+Tailwind+Flowbite, MIT license. Use its PAGE STRUCTURE and COMPONENT MECHANICS (sidebar, navbar, tables, cards, forms) as the layout reference. Do NOT copy its default gray-only color theme — this project uses its own brand tokens below.",
+    "tokens": {
+      "brand": "green-800",
+      "brand_hover": "green-900",
+      "brand_soft_bg": "green-50",
+      "app_bg": "gray-50",
+      "surface_bg": "white",
+      "border": "gray-200",
+      "text_primary": "gray-900",
+      "text_secondary": "gray-500",
+      "text_muted": "gray-400",
+      "card_radius": "rounded-2xl",
+      "control_radius": "rounded-lg",
+      "card_shadow": "shadow-sm",
+      "font_family": "Inter"
+    },
+    "sidebar_accordion_mechanism": "Flowbite's native collapse component (data-collapse-toggle=\"{id}\" on the trigger, id=\"{id}\" + class=\"hidden\" on the target <ul>/<div>) — NOT the native HTML5 <details>/<summary> element used in an earlier version of this spec. flowbite.min.js is already loaded on every layout so this needs zero extra JS. See rules/ui_templates.md section 3 for the literal markup.",
+    "dark_mode": "NOT enabled. The reference template ships `dark:` variants on every class by default; this project deliberately omits them to keep generated markup shorter and reduce the chance a 7B model applies dark: inconsistently. Do not add dark: classes unless explicitly requested."
+  },
   "canonical_snippets": {
     "description": "Literal, copy-paste-ready code that MUST be reused verbatim (only rename Model/Table/fields) instead of being regenerated from scratch. These exist because a 7B-class model is prone to hallucinating APIs for standalone/niche libraries — always prefer these over inventing new code.",
     "eloquent_capsule_bootstrap": {
