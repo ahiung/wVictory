@@ -235,7 +235,7 @@ Sistem basis kita otomatis menginisialisasi pustaka UI modern dengan hanya menye
 
 **WAJIB** dipakai untuk SEMUA form Add/Edit dan kolom tabel List di modul CRUD manapun (bukan cuma POS — pola ini generik, dipakai berulang di project apapun, persis seperti `field.xml` PHPMaker). Template lengkap ada di `mini_framework.json` → `canonical_snippets.field_schema_pattern`. Ringkasnya:
 
-1. Setiap modul punya **satu file schema** — `app/FieldSchemas/{ModelName}FieldSchema.php` — array kecil berisi definisi tiap field: `name`, `label`, `type` (`text|textarea|number|date|select|checkbox` — cuma 6 ini, jangan bikin type baru), `rules` (string Rakit, **tanpa** rule `string` — lihat `verified_gotchas`), `options` (isi untuk `select`), `show_in` (kombinasi `list`/`add`/`edit`).
+1. Setiap modul punya **satu file schema** — `app/FieldSchemas/{ModelName}FieldSchema.php` — array kecil berisi definisi tiap field: `name`, `label`, `type` (`text|textarea|number|date|select|checkbox|password` — cuma 7 ini, jangan bikin type baru), `rules` (string Rakit, **tanpa** rule `string` — lihat `verified_gotchas`), `options` (isi untuk `select`), `show_in` (kombinasi `list`/`add`/`edit`).
 2. File ini **satu-satunya sumber kebenaran** — dipakai ulang oleh 3 tempat:
    - `{Action}{ModelName}Request::validate()` — rules Rakit di-derive dari schema, bukan ditulis manual.
    - Form Add/Edit — loop schema lewat macro `partials/_form_field.twig` (dibuat sekali, dipakai semua modul).
@@ -243,3 +243,13 @@ Sistem basis kita otomatis menginisialisasi pustaka UI modern dengan hanya menye
 3. **JANGAN PERNAH** menulis `<input>` atau `<td>` manual untuk field yang sudah ada di schema — cukup tambah/ubah entri array-nya. Ini mencegah AI menulis ulang markup form dari nol setiap modul baru, dan menjamin validasi tidak pernah "lupa sinkron" dengan form-nya.
 
 Beda dengan `app/Hooks/{ModelName}Hooks.php` (dibuat sekali, tidak boleh diubah lagi) — file schema ini **memang dimaksudkan untuk diedit ulang** setiap kali field model berubah (tambah/hapus/ganti nama kolom).
+
+## 8. Form Manajemen RBAC (Role / Permission / User)
+
+Template lengkap: `mini_framework.json` → `canonical_snippets.rbac_management_forms_pattern`. Tiga form berbeda, dua di antaranya cukup pakai pola Field Schema (section 7) apa adanya, satu butuh pola khusus:
+
+1. **Kelola Role** — modul CRUD biasa, pakai Field Schema pattern langsung (`RoleFieldSchema.php`: field `name` + `slug`). Tidak ada yang spesial.
+2. **Kelola User** — modul CRUD biasa juga (`UserFieldSchema.php`: `name`, `username`, `role_id` bertipe `select`), **KECUALI** field `password`: type-nya `password` (baru, ke-7), dan `show_in` cuma `['add']` — sengaja **tidak muncul** di form Edit. Alasan: admin yang edit akun orang lain tidak boleh melihat/menyetel password mentah orang itu.
+3. **Assign Permission ke Role** — **BUKAN** pakai Field Schema (ini bukan form input teks biasa, tapi grid checkbox dikelompokkan per `module`). Halaman tersendiri (`roles/permissions.twig`), checkbox per permission, dikelompokkan pakai kolom `module` yang sudah ada di tabel `permissions`. Simpan pakai `$role->permissions()->sync($ids)` — satu baris, tidak perlu logic diff/hapus manual.
+
+**Reset password (bukan edit form)**: karena form Edit User tidak punya field password, ganti password oleh admin dilakukan lewat **aksi terpisah** ("Reset Password" per baris user) — generate password acak + `must_change_password = true`, pola yang **sama persis** dengan superadmin awal di `bin/setup.php`. Konsisten, tidak menambah pola keamanan baru.
