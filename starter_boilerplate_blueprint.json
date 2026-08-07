@@ -31,10 +31,11 @@
         "AuditLog.php"
       ],
       "Middleware": [
-        "AuthMiddleware.php",
-        "RbacMiddleware.php",
-        "CsrfMiddleware.php (Must inject Slim/Csrf/Guard tokens into Twig globals)",
-        "RateLimitMiddleware.php"
+        "AuthMiddleware.php — DO NOT write from scratch. Literal code in mini_framework.json canonical_snippets.starter_middleware_pattern.auth_middleware_template",
+        "RbacMiddleware.php — DO NOT write from scratch. Literal code in mini_framework.json canonical_snippets.starter_middleware_pattern.rbac_middleware_template (this exact class crashed a real 7B test run when written ad hoc — see verified_gotchas.middleware_constructor_call_site_mismatch)",
+        "CsrfViewMiddleware.php (Must inject Slim/Csrf/Guard tokens into Twig globals) — literal code in mini_framework.json canonical_snippets.csrf_twig_globals_middleware",
+        "RateLimitMiddleware.php — DO NOT write from scratch. Literal code in mini_framework.json canonical_snippets.starter_middleware_pattern.rate_limit_middleware_template",
+        "IMPORTANT: routes/web.php MUST instantiate all three (Auth/Rbac/RateLimit) using the EXACT call sites in canonical_snippets.starter_middleware_pattern.route_wiring_matching_call_sites — never write the `new X(...)` call from memory separately from the class."
       ]
     },
     "resources": {
