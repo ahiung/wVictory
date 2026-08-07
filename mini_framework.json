@@ -86,7 +86,8 @@
     "description": "Literal, copy-paste-ready code that MUST be reused verbatim (only rename Model/Table/fields) instead of being regenerated from scratch. These exist because a 7B-class model is prone to hallucinating APIs for standalone/niche libraries — always prefer these over inventing new code.",
     "eloquent_capsule_bootstrap": {
       "target_path": "app/bootstrap.php, required from public/index.php BEFORE the Slim App/DI container is built",
-      "code": "<?php\ndeclare(strict_types=1);\n\nuse Illuminate\\Database\\Capsule\\Manager as Capsule;\n\n$capsule = new Capsule;\n$capsule->addConnection([\n    'driver'    => 'mysql',\n    'host'      => $_ENV['DB_HOST'],\n    'database'  => $_ENV['DB_DATABASE'],\n    'username'  => $_ENV['DB_USERNAME'],\n    'password'  => $_ENV['DB_PASSWORD'],\n    'charset'   => 'utf8mb4',\n    'collation' => 'utf8mb4_unicode_ci',\n    'prefix'    => '',\n]);\n\n$capsule->setAsGlobal();\n$capsule->bootEloquent();"
+      "code": "<?php\ndeclare(strict_types=1);\n\nuse Illuminate\\Database\\Capsule\\Manager as Capsule;\nuse Illuminate\\Pagination\\Paginator;\n\n$capsule = new Capsule;\n$capsule->addConnection([\n    'driver'    => 'mysql',\n    'host'      => $_ENV['DB_HOST'],\n    'database'  => $_ENV['DB_DATABASE'],\n    'username'  => $_ENV['DB_USERNAME'],\n    'password'  => $_ENV['DB_PASSWORD'],\n    'charset'   => 'utf8mb4',\n    'collation' => 'utf8mb4_unicode_ci',\n    'prefix'    => '',\n]);\n\n$capsule->setAsGlobal();\n$capsule->bootEloquent();\n\n// REQUIRED for ->paginate() to work at all outside full Laravel (see\n// verified_gotchas.pagination_resolvers_never_registered) — without these,\n// Paginator::resolveCurrentPage() always returns 1 and resolveCurrentPath()\n// always returns '/', regardless of the real request.\nPaginator::currentPathResolver(function () {\n    return strtok($_SERVER['REQUEST_URI'] ?? '/', '?');\n});\nPaginator::currentPageResolver(function (string $pageName = 'page') {\n    return (int) ($_GET[$pageName] ?? 1);\n});\nPaginator::queryStringResolver(function () {\n    return $_GET;\n});",
+      "note": "VERIFIED BY REAL 7B TESTING (2026-08-07), root-caused by reading vendor/illuminate/pagination/AbstractPaginator.php directly: illuminate/pagination used standalone (no full Laravel framework) does NOT auto-detect the current page or request path from the HTTP request. Eloquent\\Builder::paginate() DOES call Paginator::resolveCurrentPage() and Paginator::resolveCurrentPath() internally, but both silently return hardcoded defaults (page 1, path '/') unless the three resolvers above are registered ONCE at boot. Without this, EVERY paginated list is stuck on page 1 forever no matter what ?page=N is in the URL, and every pagination link points to '/' instead of the real route — this is the actual root cause behind verified_gotchas.pagination_footer_was_never_functional, deeper than the missing Twig markup that was also fixed alongside it."
     },
     "twig_custom_extensions": {
       "target_path": "app/dependencies.php, registered on the Twig environment right after Twig::create()",
@@ -176,6 +177,20 @@
         "code": "<thead class=\"text-[11px] text-gray-400 uppercase bg-gray-50\">\n    <tr>\n        {% for field in fields %}{% if 'list' in field.show_in %}<th class=\"px-6 py-4 font-bold\">{{ field.label }}</th>{% endif %}{% endfor %}\n        <th class=\"px-6 py-4 font-bold text-center\">Aksi</th>\n    </tr>\n</thead>\n<tbody class=\"divide-y divide-gray-100\">\n    {% for row in items %}\n    <tr class=\"hover:bg-gray-50 transition-colors\">\n        {% for field in fields %}{% if 'list' in field.show_in %}<td class=\"px-6 py-4\">{{ row[field.name] }}</td>{% endif %}{% endfor %}\n        <td class=\"px-6 py-4\"><!-- action buttons, see rules/ui_templates.md section 5 --></td>\n    </tr>\n    {% endfor %}\n</tbody>"
       }
     },
+    "pagination_pattern": {
+      "description": "VERIFIED BY REAL 7B TESTING (2026-08-07): after seeding many rows, the pagination footer was non-functional — the CRUD List template (rules/ui_templates.md section 5) had ALWAYS been static example markup (href=\"#\", hardcoded \"1\"/\"2\"/\"150\") never wired to real Twig/paginator logic, and even the actual Users module built during this review only ever showed the 'Halaman X dari Y' text with no page links at all (never caught because it was only ever tested with a single seeded row). This is now a single reusable macro — write it ONCE, import it in every list view, never hand-write pagination links again. PREREQUISITE: this macro only works if canonical_snippets.eloquent_capsule_bootstrap's Paginator resolver registration is present in app/bootstrap.php — without it every page is stuck on page 1 regardless of what this macro renders. See verified_gotchas.pagination_resolvers_never_registered.",
+      "fixed_footer_macro_template": {
+        "target_path": "resources/views/partials/_pagination.twig — created ONCE, imported by every module's list view.",
+        "code": "{% macro render(paginator) %}\n{% if paginator.lastPage() > 1 %}\n<div class=\"p-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3\">\n    <p class=\"text-sm text-gray-500\">Halaman <span class=\"font-bold text-gray-900\">{{ paginator.currentPage() }}</span> dari <span class=\"font-bold text-gray-900\">{{ paginator.lastPage() }}</span> ({{ paginator.total() }} Record)</p>\n    <div class=\"flex items-center gap-1\">\n        {% if paginator.onFirstPage() %}\n        <span class=\"px-3 py-1.5 text-sm text-gray-300 bg-white border border-gray-200 rounded-md cursor-not-allowed\">Sebelumnya</span>\n        {% else %}\n        <a href=\"{{ paginator.previousPageUrl() }}\" class=\"px-3 py-1.5 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50\">Sebelumnya</a>\n        {% endif %}\n\n        {% set window = 2 %}\n        {% set startPage = max(1, paginator.currentPage() - window) %}\n        {% set endPage = min(paginator.lastPage(), paginator.currentPage() + window) %}\n\n        {% if startPage > 1 %}\n        <a href=\"{{ paginator.url(1) }}\" class=\"px-3 py-1.5 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50\">1</a>\n        {% if startPage > 2 %}<span class=\"px-2 text-sm text-gray-400\">&hellip;</span>{% endif %}\n        {% endif %}\n\n        {% for page in startPage..endPage %}\n            {% if page == paginator.currentPage() %}\n            <span class=\"px-3 py-1.5 text-sm font-medium text-white bg-green-800 rounded-md\">{{ page }}</span>\n            {% else %}\n            <a href=\"{{ paginator.url(page) }}\" class=\"px-3 py-1.5 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50\">{{ page }}</a>\n            {% endif %}\n        {% endfor %}\n\n        {% if endPage < paginator.lastPage() %}\n        {% if endPage < paginator.lastPage() - 1 %}<span class=\"px-2 text-sm text-gray-400\">&hellip;</span>{% endif %}\n        <a href=\"{{ paginator.url(paginator.lastPage()) }}\" class=\"px-3 py-1.5 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50\">{{ paginator.lastPage() }}</a>\n        {% endif %}\n\n        {% if paginator.hasMorePages() %}\n        <a href=\"{{ paginator.nextPageUrl() }}\" class=\"px-3 py-1.5 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50\">Berikutnya</a>\n        {% else %}\n        <span class=\"px-3 py-1.5 text-sm text-gray-300 bg-white border border-gray-200 rounded-md cursor-not-allowed\">Berikutnya</span>\n        {% endif %}\n    </div>\n</div>\n{% else %}\n<div class=\"p-4 border-t border-gray-200\">\n    <p class=\"text-sm text-gray-500\">{{ paginator.total() }} Record</p>\n</div>\n{% endif %}\n{% endmacro %}"
+      },
+      "controller_must_call_appends": {
+        "note": "CRITICAL: the Controller MUST call ->appends($request->getQueryParams()) on the paginator BEFORE passing it to the view. Without this, clicking a page link silently drops the current ?search=... filter (and any other query params) — the paginator has no way to know what query params to preserve otherwise.",
+        "code": "$users = $query->paginate(15);\n$users->appends($request->getQueryParams()); // preserves ?search=... etc. across page links\n\nreturn $view->render($response, 'users/index.twig', [\n    'users' => $users,\n    'search' => $search,\n]);"
+      },
+      "list_view_usage": {
+        "code": "{% import 'partials/_pagination.twig' as pagination %}\n...\n{{ pagination.render(users) }}"
+      }
+    },
     "rbac_management_forms_pattern": {
       "description": "The 3 admin forms every RBAC-enabled project needs: manage Roles, assign Permissions to a Role, manage Users. Role and User management are ordinary field_schema_pattern CRUD modules (worked examples below); Permission assignment is a DIFFERENT, one-off UI shape (grouped checkbox matrix) that does NOT fit the field-schema form — do not try to force it through partials/_form_field.twig.",
       "role_field_schema_example": {
@@ -214,7 +229,9 @@
     "middleware_constructor_call_site_mismatch": "VERIFIED BY REAL 7B TESTING (2026-08-07): a local Gemini model generating a fresh project from this spec produced a fatal crash — 'RbacMiddleware::__construct(): Argument #2 ($session) must be of type Odan\\Session\\SessionInterface, Slim\\Psr7\\Factory\\ResponseFactory given, called in routes/web.php on line 36'. Root cause: at the time, AuthMiddleware/RbacMiddleware/RateLimitMiddleware were listed ONLY as bare filenames in starter_boilerplate_blueprint.json with zero code — the model had to invent both the class's constructor AND its instantiation call site independently in two different files, and the parameter order/count it used for each disagreed with the other. This is the exact failure mode canonical_snippets exists to prevent, but these three classes had been missed. Fixed by adding canonical_snippets.starter_middleware_pattern with all three classes AND their exact routes/web.php call sites bundled as one inseparable unit. See also identity.rules CONSTRUCTOR_CALL_SITE_PAIRING — this class of bug can recur for ANY manually-`new`'d class, not just these three, so treat it as a standing rule, not a one-off fix.",
     "rakit_errorbag_firstOfAll_is_keyed_by_field_not_sequential": "VERIFIED BY REAL 7B TESTING (2026-08-07): a local Gemini model creating a User with invalid data crashed with 'Exception::__construct(): Argument #1 ($message) must be of type string, null given' instead of showing a validation error — confirmed by directly inspecting vendor/rakit/validation/src/ErrorBag.php: firstOfAll() returns an array KEYED BY FIELD NAME (e.g. ['username' => '...', 'password' => '...']), NOT a sequential array, so `->firstOfAll()[0]` is undefined unless a field happens to be literally named '0'. This exact line (`throw new Exception($validation->errors()->firstOfAll()[0]);`) was in EVERY Request template in this spec since before the framework review even began, and had silently survived this entire session because every test exercised only successful validation or business-logic exceptions (wrong password, duplicate username) — never a genuine Rakit rule failure. FIX (applied everywhere in this spec): use `$validation->errors()->all()[0]` instead — `all()` IS a plain sequential array of messages. Lesson: a canonical_snippet is only truly verified once its FAILURE path has been exercised too, not just its happy path.",
     "action_buttons_not_permission_gated": "VERIFIED BY REAL 7B TESTING (2026-08-07): a project generated from this spec, when a user was granted only the `delete` permission for a module, still showed the 'Tambah' (Add) button in the list view even though that user has no `create` permission and clicking it would just hit a 403 from RbacMiddleware. Root cause: the original CRUD List template (rules/ui_templates.md section 5) never wrapped the Add button or the per-row Edit/Delete icons in `{% if can(...) %}` — only the ACTUAL Users module built during this review had them added, ad hoc, and that fix was never propagated back to the generic template the AI actually reads. Route-level RBAC (RbacMiddleware) and view-level RBAC (`can()` hiding the control) are BOTH required — one blocks the request, the other prevents showing a button the user isn't allowed to use in the first place.",
-    "app_shell_not_responsive": "VERIFIED BY REAL 7B TESTING (2026-08-07): the navbar/sidebar App Shell did not adapt at all when the browser was resized to phone width — no hamburger button, sidebar had no responsive classes, so on a narrow screen the sidebar either overflowed off-screen or squeezed the layout instead of collapsing into a drawer. Root cause: base.twig/navbar.twig/sidebar.twig in this spec never had any responsive (mobile-drawer) markup, despite design_system naming Flowbite Admin Dashboard as the structural reference, which DOES have this pattern — it was simply never carried over. Fixed: sidebar.twig's <aside id=\"sidebar\"> now starts off-screen on mobile (-translate-x-full) and static on desktop (lg:static lg:translate-x-0); navbar.twig has a #sidebar-toggle hamburger button (lg:hidden); base.twig has a #sidebar-backdrop overlay (lg:hidden). All three ids are wired together by initSidebarToggle() in the pre-provisioned public/assets/vendor/js/app.js — no new JS needs to be written, just include the three elements with matching ids."
+    "app_shell_not_responsive": "VERIFIED BY REAL 7B TESTING (2026-08-07): the navbar/sidebar App Shell did not adapt at all when the browser was resized to phone width — no hamburger button, sidebar had no responsive classes, so on a narrow screen the sidebar either overflowed off-screen or squeezed the layout instead of collapsing into a drawer. Root cause: base.twig/navbar.twig/sidebar.twig in this spec never had any responsive (mobile-drawer) markup, despite design_system naming Flowbite Admin Dashboard as the structural reference, which DOES have this pattern — it was simply never carried over. Fixed: sidebar.twig's <aside id=\"sidebar\"> now starts off-screen on mobile (-translate-x-full) and static on desktop (lg:static lg:translate-x-0); navbar.twig has a #sidebar-toggle hamburger button (lg:hidden); base.twig has a #sidebar-backdrop overlay (lg:hidden). All three ids are wired together by initSidebarToggle() in the pre-provisioned public/assets/vendor/js/app.js — no new JS needs to be written, just include the three elements with matching ids.",
+    "pagination_footer_was_never_functional": "VERIFIED BY REAL 7B TESTING (2026-08-07): after seeding many rows into a real CRUD module (\"Barang\"), the pagination footer showed a single non-functional 'Berikutnya' button and no page numbers or 'Sebelumnya'. Root cause: rules/ui_templates.md section 5's pagination footer had ALWAYS been static illustrative markup (href=\"#\", hardcoded '1'/'2'/'150') — it was never real Twig code driven by the Illuminate paginator. This spec's own reference implementation (the Users module built earlier in this review) had the SAME gap: it only ever printed 'Halaman X dari Y (Z Record)' text with zero page links, because it was only ever tested with a single seeded row and multi-page pagination was never actually exercised. Fixed with canonical_snippets.pagination_pattern — one reusable macro (partials/_pagination.twig) using the paginator's real currentPage()/lastPage()/url()/previousPageUrl()/nextPageUrl()/onFirstPage()/hasMorePages() methods, imported by every list view. Also requires the Controller to call ->appends($request->getQueryParams()) or page links silently drop the active search filter.",
+    "pagination_resolvers_never_registered": "DEEPER ROOT CAUSE behind pagination_footer_was_never_functional, found by reading vendor/illuminate/pagination/AbstractPaginator.php directly (not by testing alone — the broken markup masked this second bug). illuminate/pagination used standalone (outside full Laravel, which is how this whole project uses it) does NOT auto-detect the current page or request path — Paginator::resolveCurrentPage() hardcodes a default of page 1 and resolveCurrentPath() hardcodes '/' UNLESS Paginator::currentPageResolver()/currentPathResolver()/queryStringResolver() are registered once at boot. Confirmed Eloquent\\Builder::paginate() (vendor/illuminate/database/Eloquent/Builder.php:921,935) DOES call these resolvers internally, so registering them is sufficient — no other wiring needed. Without this fix, even a perfect pagination_pattern macro would have been permanently stuck on page 1 with every link pointing at '/', no matter how correct the Twig was. Fixed by adding the three resolver registrations to canonical_snippets.eloquent_capsule_bootstrap (app/bootstrap.php) — this is genuinely part of Eloquent bootstrap, not a view concern, which is why it lives there and not in pagination_pattern."
   },
   "execution_pipeline": {
     "description": "10-Step Mandatory File Generation Contract for every feature/CRUD request",
@@ -223,14 +240,22 @@
         "step": 1,
         "name": "migration_sql",
         "target_path_pattern": "database/migrations/{seq}_create_{table}_table.sql",
-        "requirements": ["soft_deletes", "foreign_key_constraints", "index_on_fks", "created_at_updated_at_deleted_at"],
+        "requirements": [
+          "soft_deletes",
+          "foreign_key_constraints",
+          "index_on_fks",
+          "created_at_updated_at_deleted_at"
+        ],
         "owasp_ref": "A01, A03"
       },
       {
         "step": 2,
         "name": "rbac_permission_seeder",
         "target_path_pattern": "database/migrations/{seq}_seed_{module}_permissions.sql",
-        "requirements": ["insert_permissions_with_dot_slug: '{module}.{action}' e.g. 'products.view', 'products.create' — matches the seeded core permissions (users.view, roles.view, etc.) and what canonical_snippets.rbac_management_forms_pattern's permission matrix groups by (the `module` column)", "assign_to_roles"],
+        "requirements": [
+          "insert_permissions_with_dot_slug: '{module}.{action}' e.g. 'products.view', 'products.create' — matches the seeded core permissions (users.view, roles.view, etc.) and what canonical_snippets.rbac_management_forms_pattern's permission matrix groups by (the `module` column)",
+          "assign_to_roles"
+        ],
         "owasp_ref": "A01"
       },
       {
@@ -282,21 +307,36 @@
         "step": 6,
         "name": "di_container_wiring",
         "target_path_pattern": "app/dependencies.php",
-        "requirements": ["register_service_in_php_di", "register_controller_in_php_di", "register_twig_custom_extensions (see canonical_snippets.twig_custom_extensions)"],
+        "requirements": [
+          "register_service_in_php_di",
+          "register_controller_in_php_di",
+          "register_twig_custom_extensions (see canonical_snippets.twig_custom_extensions)"
+        ],
         "owasp_ref": "A04"
       },
       {
         "step": 7,
         "name": "controller_layer",
         "target_path_pattern": "app/Controllers/{ModelName}Controller.php",
-        "requirements": ["declare_strict_types", "no_raw_sql", "render_twig_or_json (see canonical_snippets.controller_twig_render)", "centralized_error_handling"],
+        "requirements": [
+          "declare_strict_types",
+          "no_raw_sql",
+          "render_twig_or_json (see canonical_snippets.controller_twig_render)",
+          "centralized_error_handling",
+          "PAGINATOR_MUST_CALL_APPENDS: any index()/list method using ->paginate() MUST call ->appends($request->getQueryParams()) on the result before passing it to the view, or pagination links silently drop the current search/filter query params. See canonical_snippets.pagination_pattern.controller_must_call_appends."
+        ],
         "owasp_ref": "A03, A05"
       },
       {
         "step": 8,
         "name": "routes_and_middleware",
         "target_path_pattern": "routes/web.php",
-        "requirements": ["register_crud_urls", "attach_auth_middleware", "attach_rbac_permission_middleware", "csrf_middleware"],
+        "requirements": [
+          "register_crud_urls",
+          "attach_auth_middleware",
+          "attach_rbac_permission_middleware",
+          "csrf_middleware"
+        ],
         "owasp_ref": "A01, A08"
       },
       {
@@ -309,7 +349,8 @@
           "sweetalert_confirm_delete",
           "csrf_token_field_using_twig_globals",
           "USE_FIELD_SCHEMA_FOR_LIST_AND_ADD_EDIT: list table columns and add/edit form inputs MUST be generated by looping app/FieldSchemas/{ModelName}FieldSchema.php through partials/_form_field.twig (add/edit) and a plain {% for field in fields %} loop (list columns) — see canonical_snippets.field_schema_pattern.add_edit_view_usage and list_columns_usage. NEVER hand-write an <input> or <td> for a field the schema already describes.",
-          "WRAP_ACTION_BUTTONS_WITH_CAN: VERIFIED BY REAL 7B TESTING (2026-08-07) — the 'Tambah {{ entity_name }}' button and the Edit/Delete action icons per row MUST be wrapped in `{% if can('{module}.create') %}` / `{% if can('{module}.edit') %}` / `{% if can('{module}.delete') %}` respectively. RbacMiddleware on the route only blocks direct URL access to that action — it does NOT hide the button itself, so a user with e.g. only `{module}.delete` would otherwise still see (and be confused by) an Add button they cannot use. See rules/ui_templates.md section 5 and verified_gotchas.action_buttons_not_permission_gated."
+          "WRAP_ACTION_BUTTONS_WITH_CAN: VERIFIED BY REAL 7B TESTING (2026-08-07) — the 'Tambah {{ entity_name }}' button and the Edit/Delete action icons per row MUST be wrapped in `{% if can('{module}.create') %}` / `{% if can('{module}.edit') %}` / `{% if can('{module}.delete') %}` respectively. RbacMiddleware on the route only blocks direct URL access to that action — it does NOT hide the button itself, so a user with e.g. only `{module}.delete` would otherwise still see (and be confused by) an Add button they cannot use. See rules/ui_templates.md section 5 and verified_gotchas.action_buttons_not_permission_gated.",
+          "USE_PAGINATION_PARTIAL: VERIFIED BY REAL 7B TESTING (2026-08-07) — list views MUST render their pagination footer via `{% import 'partials/_pagination.twig' as pagination %}` + `{{ pagination.render(items) }}`. NEVER hand-write pagination links (href=\"#\" or hardcoded page numbers) — that was the OLD example markup and produces a non-functional footer once there is more than one page. See canonical_snippets.pagination_pattern."
         ],
         "template_instructions": "Always include `<input type=\"hidden\" name=\"{{ csrf.keys.name }}\" value=\"{{ csrf.name }}\">` and `<input type=\"hidden\" name=\"{{ csrf.keys.value }}\" value=\"{{ csrf.value }}\">` in all POST forms. Delete actions MUST use the `js-confirm-delete` form class (handled by public/assets/vendor/js/app.js via SweetAlert2) instead of native `onsubmit=\"confirm(...)\"`. base.twig MUST also render `<meta name=\"csrf-name\" content=\"{{ csrf.name }}\">` and `<meta name=\"csrf-value\" content=\"{{ csrf.value }}\">` in <head>, plus a `<div id=\"app-loader\" class=\"hidden fixed inset-0 z-50 ...\">` element — both are read by app.js for the Axios CSRF header and the global loading overlay.",
         "owasp_ref": "A03, A06, A08"
@@ -377,7 +418,11 @@
         "last_migration": "e.g. 0007_create_barang_masuk_table.sql",
         "last_updated": "ISO-8601 timestamp"
       },
-      "modules_completed": ["auth", "profile", "dashboard"],
+      "modules_completed": [
+        "auth",
+        "profile",
+        "dashboard"
+      ],
       "known_issues_log": [
         {
           "date": "ISO-8601 timestamp",

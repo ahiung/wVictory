@@ -224,16 +224,14 @@ Digunakan untuk halaman indeks/tabel data pada setiap modul CRUD (seperti Master
         </table>
     </div>
 
-    <!-- Pagination Footer -->
-    <div class="p-4 border-t border-gray-200 flex items-center justify-between">
-        <p class="text-sm text-gray-500">Halaman <span class="font-bold text-gray-900">1</span> dari <span class="font-bold text-gray-900">10</span> (<span class="font-bold text-gray-900">150</span> Record)</p>
-        <div class="flex items-center gap-1">
-            <a href="#" class="px-3 py-1.5 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Sebelumnya</a>
-            <a href="#" class="px-3 py-1.5 text-sm font-medium text-white bg-green-800 rounded-md">1</a>
-            <a href="#" class="px-3 py-1.5 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50">2</a>
-            <a href="#" class="px-3 py-1.5 text-sm text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Berikutnya</a>
-        </div>
-    </div>
+    <!-- Pagination Footer — WAJIB pakai macro ini, JANGAN tulis link halaman manual (href="#").
+         Ketahuan jadi bug nyata dari tes 7B (2026-08-07): setelah data banyak, pagination lama
+         cuma markup contoh statis, tidak pernah nyambung ke paginator sungguhan.
+         Lihat mini_framework.json → canonical_snippets.pagination_pattern (macro lengkap +
+         requirement Controller WAJIB panggil ->appends() supaya filter search tidak hilang
+         saat pindah halaman). -->
+    {% import 'partials/_pagination.twig' as pagination %}
+    {{ pagination.render(items) }}
 </div>
 ```
 
