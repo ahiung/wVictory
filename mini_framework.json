@@ -13,7 +13,8 @@
       "ZERO_TRUST_SECURITY: Enforce OWASP Top 10 security guardrails at every layer of generation.",
       "STRICT_FRAMEWORK_RULE: You are using SLIM 4, NOT LARAVEL. DO NOT USE Laravel Facades (e.g. View::, Validator::, DB::), DO NOT USE Laravel HTTP Requests (Illuminate\\Http\\Request) or FormRequest.",
       "STRICT_PSR7_RULE: ALWAYS use Psr\\Http\\Message\\ServerRequestInterface and Psr\\Http\\Message\\ResponseInterface for Controllers.",
-      "HOOK_PROTECTION: app/Hooks/{ModelName}Hooks.php files are created ONCE and must NEVER be overwritten, edited, or regenerated after they first exist — always check file existence before writing one. See hook_protocol and canonical_snippets.hooks_pattern."
+      "HOOK_PROTECTION: app/Hooks/{ModelName}Hooks.php files are created ONCE and must NEVER be overwritten, edited, or regenerated after they first exist — always check file existence before writing one. See hook_protocol and canonical_snippets.hooks_pattern.",
+      "NO_EXTERNAL_FETCH: NEVER attempt to download, curl, or fetch anything from the internet during code generation (assets, reference templates, package files). Every third-party asset or reference this project needs is already saved locally (public/assets/vendor/ for runtime assets, reference/ for design/structure references) — if something seems missing, say so instead of trying to fetch it."
     ]
   },
   "onboarding_protocol": {
@@ -60,7 +61,7 @@
   },
   "design_system": {
     "description": "Structural/visual reference for every Twig template. Purpose: give AI a fixed, small vocabulary of Tailwind values to reuse instead of picking new-but-similar values each time (e.g. rounded-2xl vs rounded-xl) — the same discipline canonical_snippets applies to PHP, applied here to markup.",
-    "reference_template": "Flowbite Admin Dashboard (github.com/themesberg/flowbite-admin-dashboard) — HTML+Tailwind+Flowbite, MIT license. Use its PAGE STRUCTURE and COMPONENT MECHANICS (sidebar, navbar, tables, cards, forms) as the layout reference. Do NOT copy its default gray-only color theme — this project uses its own brand tokens below.",
+    "reference_template": "Flowbite Admin Dashboard, MIT license. NEVER fetch it from GitHub — a 7B model cannot reliably download external URLs at generation time. The actual source files are already saved locally at reference/flowbite-admin-dashboard/ (see its README.md for how to use them). Use its PAGE STRUCTURE and COMPONENT MECHANICS (sidebar, navbar, tables, cards, forms) as the layout reference. Do NOT copy its default gray-only color theme or dark: classes — this project uses its own brand tokens below. Prefer rules/ui_templates.md (already Twig-adapted) over the raw reference/ files whenever the pattern you need is already covered there.",
     "tokens": {
       "brand": "green-800",
       "brand_hover": "green-900",
