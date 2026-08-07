@@ -424,7 +424,7 @@
   },
   "project_brain_protocol": {
     "brain_file_name": "PROJECT_BRAIN.json",
-    "on_init": "AI must inspect project directory and auto-generate PROJECT_BRAIN.json using the exact schema in 'schema_example' below. NEVER invent a different structure — a small model that reinvents the schema each session breaks continuity.",
+    "on_init": "PROJECT_BRAIN.json ALREADY EXISTS at the project root (committed with the spec). AI must READ it at the start of every session and UPDATE it in place; only generate it from scratch if it is genuinely missing, using the exact schema in 'schema_example' below. NEVER invent a different structure — a small model that reinvents the schema each session breaks continuity.",
     "on_task_complete": "AI MUST update 'current_state' (last_feature, last_migration) and 'known_issues_log' in PROJECT_BRAIN.json.",
     "schema_example": {
       "project_name": "string",

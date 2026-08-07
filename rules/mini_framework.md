@@ -1,10 +1,9 @@
-# AUTO-TRIGGER MINI FRAMEWORK & DYNAMIC BRAIN EVOLVE PROTOCOL
+# (Dipindahkan) Aturan auto-trigger ada di `AGENTS.md`
 
-> 🚨 **ABSOLUTE MANDATORY RULE FOR ALL AI ASSISTANTS**:
-> 
-> 1. **Framework Engine**: Read `mini_framework.json` and `starter_boilerplate_blueprint.json` (project root) automatically on every task.
-> 2. **Execution Pipeline**: Always follow the 10-Step Mandatory Execution Pipeline for feature requests.
-> 3. **OWASP Top 10 Security**: Enforce OWASP Top 10 Security Guardrails (Data Scope validation, CSRF, Strict Type casting, SoftDeletes, No-CDN).
-> 4. 🧠 **AUTOMATIC BRAIN EVOLVE (CRITICAL)**:
->    - Every time an essential change, bug fix, or new module is completed, the AI MUST **PROACTIVELY AND AUTOMATICALLY** update `PROJECT_BRAIN.json` (`current_state` and `known_issues_log`).
->    - **NEVER WAIT FOR THE USER TO REMIND YOU TO UPDATE THE BRAIN FILE.** It is a mandatory end-of-task requirement.
+Isi file ini sudah dipindahkan ke **`AGENTS.md` di root proyek**, karena folder `rules/` tidak pernah dibaca otomatis oleh AI agent mana pun — sementara `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` di root memang di-load otomatis. Selama aturannya di sini, aturan "baca spec di setiap task" praktis tidak pernah aktif.
+
+File ini sengaja ditinggal sebagai penunjuk supaya link/refrensi lama ke `rules/mini_framework.md` tidak putus.
+
+➡️ **Baca `AGENTS.md`.**
+
+Yang masih tinggal di folder ini: `rules/ui_templates.md` (markup Twig siap pakai) — itu tetap file konten yang aktif dan dirujuk dari `AGENTS.md`.
