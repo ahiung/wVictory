@@ -4,6 +4,7 @@
   "version": "1.1.0",
   "description": "Standardized application baseline pre-built with Auth, Profile, Layout, Sidebar, Navbar, Dashboard, and Auto DB Installer.",
   "directory_structure": {
+    "composer.json": "MUST be created FIRST, before any other file, then run `composer install`. DO NOT write its require block from memory — copy it VERBATIM from mini_framework.json canonical_snippets.composer_json_template (verified via a real 7B test that skipping this and inferring packages from scattered `use` statements misses illuminate/pagination, which is a hard boot-time requirement since app/bootstrap.php registers its Paginator resolvers on every request — see verified_gotchas.eloquent_pagination_needs_separate_package).",
     "bin": [
       "setup.php (Automated Database Creation, Migration Runner, and Default Seeder)"
     ],
