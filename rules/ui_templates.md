@@ -237,7 +237,7 @@ Sistem basis kita otomatis menginisialisasi pustaka UI modern dengan hanya menye
 
 1. Setiap modul punya **satu file schema** — `app/FieldSchemas/{ModelName}FieldSchema.php` — array kecil berisi definisi tiap field: `name`, `label`, `type` (`text|textarea|number|date|select|checkbox|password` — cuma 7 ini, jangan bikin type baru), `rules` (string Rakit, **tanpa** rule `string` — lihat `verified_gotchas`), `options` (isi untuk `select`), `show_in` (kombinasi `list`/`add`/`edit`).
 2. File ini **satu-satunya sumber kebenaran** — dipakai ulang oleh 3 tempat:
-   - `{Action}{ModelName}Request::validate()` — rules Rakit di-derive dari schema, bukan ditulis manual.
+   - `{ModelName}Request::validate($data, $action)` — SATU class dipakai untuk Add maupun Edit, rules Rakit di-derive dari schema **dan difilter per `$action`** lewat `show_in` tiap field (kalau tidak, field seperti `password` yang cuma `show_in: ['add']` akan tetap dianggap wajib pas Edit padahal form Edit tidak pernah menampilkannya — lihat `verified_gotchas.field_schema_rules_must_be_filtered_by_action`).
    - Form Add/Edit — loop schema lewat macro `partials/_form_field.twig` (dibuat sekali, dipakai semua modul).
    - Kolom tabel List — loop schema yang sama untuk `<th>`/`<td>`.
 3. **JANGAN PERNAH** menulis `<input>` atau `<td>` manual untuk field yang sudah ada di schema — cukup tambah/ubah entri array-nya. Ini mencegah AI menulis ulang markup form dari nol setiap modul baru, dan menjamin validasi tidak pernah "lupa sinkron" dengan form-nya.
