@@ -90,6 +90,22 @@
         "note": "Every CUD method in the Service MUST call the matching hook at these exact points — before the write inside the transaction, and after it but still inside the transaction (so a hook exception rolls back the write too).",
         "code": "public function __construct(\n    private readonly {ModelName}Hooks $hooks,\n    private readonly AuditService $auditService,\n) {\n}\n\npublic function create(array $data): {ModelName}\n{\n    return Capsule::transaction(function () use ($data) {\n        $data = $this->hooks->beforeCreate($data);\n        $model = {ModelName}::create($data);\n        $this->hooks->afterCreate($model);\n        $this->auditService->log(null, 'create', '{module}', 'Created {ModelName} #' . $model->id, null, null);\n        return $model;\n    });\n}"
       }
+    },
+    "menu_registry_pattern": {
+      "description": "PHPMaker-inspired (verified by inspecting its actual menu.html template: sidebar/navbar items are built from a metadata array — id, label, url, parentId, security, icon — rendered by ONE generic mechanism, never hand-authored HTML per module). Adopting a new module's nav link must NEVER require editing sidebar.twig's HTML/accordion structure — that is the #1 way a 7B model corrupts an unrelated module's markup.",
+      "menu_php_template": {
+        "target_path": "app/menu.php — created once by the starter boilerplate; every later module APPENDS one array entry here, nothing else",
+        "code": "<?php\ndeclare(strict_types=1);\n\n/**\n * Central navigation registry. resources/views/partials/sidebar.twig renders this\n * array GENERICALLY. NEVER hand-edit sidebar.twig's HTML to add a nav link —\n * append one entry here instead.\n *\n * Fields:\n *   id         string  unique key. Also used as the 'parent' value for children.\n *   label      string  visible text.\n *   route      ?string url, or null for a parent-only accordion header with no link.\n *   icon       ?string key into the $icons map defined in sidebar.twig, or null.\n *   permission ?string permission slug required to see this item, or null = always visible.\n *   parent     ?string id of the parent item to nest under (accordion), or null = top-level.\n */\nreturn [\n    [\n        'id' => 'dashboard',\n        'label' => 'Dashboard',\n        'route' => '/dashboard',\n        'icon' => 'dashboard',\n        'permission' => null,\n        'parent' => null,\n    ],\n    // Add new modules here, e.g.:\n    // [\n    //     'id' => '{module}',\n    //     'label' => '{Label}',\n    //     'route' => '/{module}',\n    //     'icon' => null,\n    //     'permission' => '{module}.view',\n    //     'parent' => null, // or an existing group id\n    // ],\n];"
+      },
+      "menu_builder_template": {
+        "target_path": "app/Support/MenuBuilder.php — created once, never regenerated",
+        "code": "<?php\ndeclare(strict_types=1);\n\nnamespace App\\Support;\n\nclass MenuBuilder\n{\n    /**\n     * @param string[] $permissions\n     * @return array<int, array<string, mixed>>\n     */\n    public function build(string $menuFilePath, array $permissions): array\n    {\n        $items = require $menuFilePath;\n\n        $visible = array_values(array_filter(\n            $items,\n            static fn (array $item): bool => $item['permission'] === null || in_array($item['permission'], $permissions, true)\n        ));\n\n        $topLevel = array_values(array_filter(\n            $visible,\n            static fn (array $item): bool => $item['parent'] === null\n        ));\n\n        foreach ($topLevel as &$node) {\n            $node['children'] = array_values(array_filter(\n                $visible,\n                static fn (array $item): bool => $item['parent'] === $node['id']\n            ));\n        }\n        unset($node);\n\n        return $topLevel;\n    }\n}"
+      },
+      "wiring": {
+        "note": "Built once per request in AuthMiddleware (already has the session and is already computing the auth_user Twig global) and exposed as the `menu` Twig global. Registered in app/dependencies.php as \\App\\Support\\MenuBuilder::class => \\DI\\autowire(), and injected into AuthMiddleware's constructor wherever it is instantiated (routes/web.php).",
+        "code": "$menu = $this->menuBuilder->build(dirname(__DIR__) . '/menu.php', (array) $this->session->get('permissions'));\n$view = Twig::fromRequest($request)->getEnvironment();\n$view->addGlobal('auth_user', $authUser);\n$view->addGlobal('menu', $menu);"
+      },
+      "sidebar_render_note": "sidebar.twig loops `{% for item in menu %}`, rendering an <details> accordion when `item.children` is non-empty and a plain <a> otherwise. A small `{% set icons = {...} %}` dict at the top of sidebar.twig maps icon keys to inline SVG — that dict is the ONLY part of sidebar.twig a new module may need to touch (to add a new icon key), never the loop/render logic itself."
     }
   },
   "verified_gotchas": {
@@ -193,8 +209,12 @@
       {
         "step": 10,
         "name": "sidebar_navigation",
-        "target_path_pattern": "resources/views/partials/sidebar.twig",
-        "requirements": ["add_nav_link", "wrap_with_can_permission_check"],
+        "target_path_pattern": "app/menu.php",
+        "requirements": [
+          "APPEND_ONE_ENTRY_ONLY (see canonical_snippets.menu_registry_pattern.menu_php_template): id, label, route, icon, permission, parent",
+          "NEVER_HAND_EDIT_SIDEBAR_TWIG: resources/views/partials/sidebar.twig is a generic renderer over app/menu.php and must never be edited to add a nav link — if it needs a NEW icon key, add it to the `icons` map at the top of sidebar.twig, nothing else in that file changes",
+          "permission_filtering_is_automatic: App\\Support\\MenuBuilder already filters by session permissions; do not wrap menu.php entries in {% if can(...) %} — that was the OLD per-module hand-edit pattern, now obsolete"
+        ],
         "owasp_ref": "A01"
       }
     ]
