@@ -12,7 +12,8 @@
       "AUTO_WIRING: Always register dependencies, routes, permissions, and navigation automatically.",
       "ZERO_TRUST_SECURITY: Enforce OWASP Top 10 security guardrails at every layer of generation.",
       "STRICT_FRAMEWORK_RULE: You are using SLIM 4, NOT LARAVEL. DO NOT USE Laravel Facades (e.g. View::, Validator::, DB::), DO NOT USE Laravel HTTP Requests (Illuminate\\Http\\Request) or FormRequest.",
-      "STRICT_PSR7_RULE: ALWAYS use Psr\\Http\\Message\\ServerRequestInterface and Psr\\Http\\Message\\ResponseInterface for Controllers."
+      "STRICT_PSR7_RULE: ALWAYS use Psr\\Http\\Message\\ServerRequestInterface and Psr\\Http\\Message\\ResponseInterface for Controllers.",
+      "HOOK_PROTECTION: app/Hooks/{ModelName}Hooks.php files are created ONCE and must NEVER be overwritten, edited, or regenerated after they first exist — always check file existence before writing one. See hook_protocol and canonical_snippets.hooks_pattern."
     ]
   },
   "onboarding_protocol": {
@@ -22,6 +23,11 @@
       "Option A: Generate Starter Skeleton Boilerplate first (Recommended for full apps)",
       "Option B: Build custom module directly on a clean/blank slate"
     ]
+  },
+  "hook_protocol": {
+    "description": "Inspired by PHPMaker's Server Events mechanism (verified by inspecting its actual generator template package): PHPMaker splices user-authored PHP, stored SEPARATELY from generated files, into fixed injection points (Page_Load, Page_DataRendering, etc.) so regenerating a page NEVER destroys custom business logic. We replicate the same base/custom separation for this framework.",
+    "rule": "Every {ModelName}Service.php MUST call out to a companion App\\Hooks\\{ModelName}Hooks.php at fixed points (see canonical_snippets.hooks_pattern). The Service class MAY be freely regenerated/rewritten on every request. The Hooks class MUST be created ONLY THE FIRST TIME a module is scaffolded — if app/Hooks/{ModelName}Hooks.php already exists, AI MUST leave it completely untouched, no matter what changes are requested to the module, unless the user EXPLICITLY asks to edit that specific hooks file.",
+    "why": "Without this separation, every 'regenerate this module' or 'add a field to this table' request forces the AI to rewrite the whole Service class from scratch, silently deleting any business-specific logic (discounts, stock checks, notifications, etc.) a human or a previous AI session had added inside it. Splitting fixed CRUD plumbing (regenerable) from business rules (permanent, hand-authored) mirrors exactly how PHPMaker survives re-generation without losing customization."
   },
   "tech_stack": {
     "backend": {
@@ -72,6 +78,18 @@
       "target_path": "app/Middleware/CsrfViewMiddleware.php, registered AFTER Slim\\Csrf\\Guard so csrf attributes already exist on the request. Also the correct place to persist the session (see verified_gotchas.session_never_persisted_without_save).",
       "note": "VERIFIED BY ACTUALLY RUNNING THE APP (2026-08-06). csrf.keys.name/csrf.keys.value are the Guard's getTokenNameKey()/getTokenValueKey() — CONSTANT strings like 'csrf_name'/'csrf_value' — NOT separate request attributes. There is no 'csrf_name_key'/'csrf_value_key' attribute; an earlier version of this spec used that and it silently rendered `name=\"\"` on both hidden inputs, breaking every POST form.",
       "code": "public function __construct(\n    private readonly SessionInterface $session,\n    private readonly Guard $guard,\n) {\n}\n\npublic function process(Request $request, Handler $handler): Response\n{\n    $view = Twig::fromRequest($request);\n    $view->getEnvironment()->addGlobal('csrf', [\n        'keys' => [\n            'name'  => $this->guard->getTokenNameKey(),\n            'value' => $this->guard->getTokenValueKey(),\n        ],\n        'name'  => $request->getAttribute('csrf_name'),\n        'value' => $request->getAttribute('csrf_value'),\n    ]);\n\n    $flash = $this->session->getFlash();\n    $view->getEnvironment()->addGlobal('flash', [\n        'error' => $flash->get('error'),\n        'success' => $flash->get('success'),\n    ]);\n\n    $response = $handler->handle($request);\n    $this->session->save();\n    return $response;\n}"
+    },
+    "hooks_pattern": {
+      "description": "PHPMaker-inspired base/custom split (see hook_protocol). The Service is fully regenerable; the Hooks class is written once and permanently owned by whoever customizes it — human or a past AI session.",
+      "hooks_class_template": {
+        "target_path": "app/Hooks/{ModelName}Hooks.php",
+        "creation_rule": "ONLY create this file if it does not already exist. If it exists, NEVER modify it as part of regenerating {ModelName}Service.php or any other step.",
+        "code": "<?php\ndeclare(strict_types=1);\n\nnamespace App\\Hooks;\n\nuse App\\Models\\{ModelName};\n\n/**\n * Business-specific customization for {ModelName}. Created ONCE by the AI — never\n * regenerated or overwritten afterwards, even when {ModelName}Service.php itself\n * is rewritten. Add discounts, stock checks, notifications, cross-module side\n * effects, etc. here instead of inside the Service.\n */\nclass {ModelName}Hooks\n{\n    public function beforeCreate(array $data): array\n    {\n        return $data; // mutate/validate $data before insert, or throw to abort\n    }\n\n    public function afterCreate({ModelName} $model): void\n    {\n    }\n\n    public function beforeUpdate({ModelName} $model, array $data): array\n    {\n        return $data;\n    }\n\n    public function afterUpdate({ModelName} $model): void\n    {\n    }\n\n    public function beforeDelete({ModelName} $model): void\n    {\n        // throw to abort deletion (e.g. still referenced elsewhere)\n    }\n\n    public function afterDelete({ModelName} $model): void\n    {\n    }\n}"
+      },
+      "service_calling_hooks_example": {
+        "note": "Every CUD method in the Service MUST call the matching hook at these exact points — before the write inside the transaction, and after it but still inside the transaction (so a hook exception rolls back the write too).",
+        "code": "public function __construct(\n    private readonly {ModelName}Hooks $hooks,\n    private readonly AuditService $auditService,\n) {\n}\n\npublic function create(array $data): {ModelName}\n{\n    return Capsule::transaction(function () use ($data) {\n        $data = $this->hooks->beforeCreate($data);\n        $model = {ModelName}::create($data);\n        $this->hooks->afterCreate($model);\n        $this->auditService->log(null, 'create', '{module}', 'Created {ModelName} #' . $model->id, null, null);\n        return $model;\n    });\n}"
+      }
     }
   },
   "verified_gotchas": {
@@ -127,7 +145,15 @@
         "step": 5,
         "name": "service_layer",
         "target_path_pattern": "app/Services/{ModelName}Service.php",
-        "requirements": ["declare_strict_types", "constructor_injection", "db_transaction_wrapper", "data_scope_validation_idor", "audit_log_call"],
+        "requirements": [
+          "declare_strict_types",
+          "constructor_injection",
+          "db_transaction_wrapper",
+          "data_scope_validation_idor",
+          "audit_log_call",
+          "call_hooks_at_fixed_points (see canonical_snippets.hooks_pattern.service_calling_hooks_example) for every create/update/delete method",
+          "ALSO_ENSURE_EXISTS (do not overwrite if present): app/Hooks/{ModelName}Hooks.php — see canonical_snippets.hooks_pattern.hooks_class_template and hook_protocol"
+        ],
         "owasp_ref": "A01, A04, A09"
       },
       {
