@@ -127,7 +127,31 @@
         "note": "Built once per request in AuthMiddleware (already has the session and is already computing the auth_user Twig global) and exposed as the `menu` Twig global. Registered in app/dependencies.php as \\App\\Support\\MenuBuilder::class => \\DI\\autowire(), and injected into AuthMiddleware's constructor wherever it is instantiated (routes/web.php).",
         "code": "$menu = $this->menuBuilder->build(dirname(__DIR__) . '/menu.php', (array) $this->session->get('permissions'));\n$view = Twig::fromRequest($request)->getEnvironment();\n$view->addGlobal('auth_user', $authUser);\n$view->addGlobal('menu', $menu);"
       },
-      "sidebar_render_note": "sidebar.twig loops `{% for item in menu %}`, rendering an <details> accordion when `item.children` is non-empty and a plain <a> otherwise. A small `{% set icons = {...} %}` dict at the top of sidebar.twig maps icon keys to inline SVG — that dict is the ONLY part of sidebar.twig a new module may need to touch (to add a new icon key), never the loop/render logic itself."
+      "sidebar_render_note": "sidebar.twig loops `{% for item in menu %}`, rendering a Flowbite data-collapse-toggle accordion (see design_system.sidebar_accordion_mechanism) when `item.children` is non-empty and a plain <a> otherwise. A small `{% set icons = {...} %}` dict at the top of sidebar.twig maps icon keys to inline SVG — that dict is the ONLY part of sidebar.twig a new module may need to touch (to add a new icon key), never the loop/render logic itself."
+    },
+    "field_schema_pattern": {
+      "description": "PHPMaker-inspired (verified by inspecting its field.xml settings + list-single-column.html field loop: every column/input is rendered by ONE generic mechanism driven by a small per-field metadata array — name, format/type, validation — never hand-written per field). Adopting this means a new CRUD module needs only a small data array, not hand-written <input>/<td> markup for every field. This is deliberately GENERIC — not POS-specific — because it must repeat identically across any future project built on this framework, exactly like PHPMaker's own field settings.",
+      "field_types_fixed_vocabulary": "text | textarea | number | date | select | checkbox — ONLY these six. Every one already has a matching local vendor library wired in app.js (date -> Flatpickr via class datepicker, select -> Choices.js via class data-choices, the rest are plain HTML). NEVER invent a new type without updating partials/_form_field.twig first.",
+      "field_schema_template": {
+        "target_path": "app/FieldSchemas/{ModelName}FieldSchema.php — the SINGLE source of truth for this model's fields. Feeds: Rakit validation rules (step 4), list table columns AND add/edit form inputs (step 9). Created once per module; edited in place when a field is added/removed (unlike Hooks, this file IS meant to be maintained as the model evolves).",
+        "code": "<?php\ndeclare(strict_types=1);\n\n/**\n * Field definitions for {ModelName}. Single source of truth — read by\n * {Action}{ModelName}Request (validation), and by the list/add/edit Twig views\n * via partials/_form_field.twig (rendering). Never duplicate field markup by hand\n * when this schema already describes the field.\n *\n * Fields:\n *   name    string   column/input name, matches the DB column and Eloquent $fillable entry.\n *   label   string   human label shown in <label>/<th>.\n *   type    string   one of: text | textarea | number | date | select | checkbox.\n *   rules   string   Rakit\\Validation rule string, e.g. 'required|max:255' (NEVER include\n *                    'string' — Rakit has no such rule, see verified_gotchas).\n *   options ?array   [['value' => ..., 'label' => ...], ...] — REQUIRED when type = select, else null.\n *   show_in string[] subset of ['list', 'add', 'edit'] — which pages render this field.\n */\nreturn [\n    [\n        'name' => 'nama',\n        'label' => 'Nama',\n        'type' => 'text',\n        'rules' => 'required|max:255',\n        'options' => null,\n        'show_in' => ['list', 'add', 'edit'],\n    ],\n    // Add more fields here, e.g.:\n    // [\n    //     'name' => 'kategori_id',\n    //     'label' => 'Kategori',\n    //     'type' => 'select',\n    //     'rules' => 'required|integer',\n    //     'options' => null, // populated by the Controller at render time from the DB, see wiring note\n    //     'show_in' => ['list', 'add', 'edit'],\n    // ],\n];"
+      },
+      "request_deriving_rules_from_schema": {
+        "target_path": "app/Requests/{Action}{ModelName}Request.php — REPLACES the old hardcoded-rules template in step 4. Rules now come from the schema, so validation can never drift out of sync with the form/list.",
+        "code": "<?php\ndeclare(strict_types=1);\nnamespace App\\Requests;\n\nuse Rakit\\Validation\\Validator;\nuse Exception;\n\nclass {Action}{ModelName}Request\n{\n    public static function validate(array $data): array\n    {\n        $fields = require dirname(__DIR__) . '/FieldSchemas/{ModelName}FieldSchema.php';\n\n        $rules = [];\n        foreach ($fields as $field) {\n            $rules[$field['name']] = $field['rules'];\n        }\n\n        $validator = new Validator();\n        $validation = $validator->make($data, $rules);\n        $validation->validate();\n        if ($validation->fails()) {\n            throw new Exception($validation->errors()->firstOfAll()[0]);\n        }\n        return $validation->getValidData();\n    }\n}"
+      },
+      "form_field_macro_template": {
+        "target_path": "resources/views/partials/_form_field.twig — created ONCE, shared by every module's add/edit view. NEVER hand-write an <input> for a field this macro already covers.",
+        "code": "{% macro input(field, value) %}\n<div class=\"mb-4\">\n    <label class=\"block text-sm font-medium text-gray-700 mb-1.5\">{{ field.label }}</label>\n    {% if field.type == 'textarea' %}\n    <textarea name=\"{{ field.name }}\" rows=\"3\" class=\"w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5\">{{ value }}</textarea>\n    {% elseif field.type == 'select' %}\n    <select name=\"{{ field.name }}\" class=\"data-choices w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg p-2.5\">\n        {% for opt in field.options %}\n        <option value=\"{{ opt.value }}\"{{ opt.value == value ? ' selected' : '' }}>{{ opt.label }}</option>\n        {% endfor %}\n    </select>\n    {% elseif field.type == 'date' %}\n    <input type=\"text\" name=\"{{ field.name }}\" value=\"{{ value }}\" class=\"datepicker w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5\">\n    {% elseif field.type == 'checkbox' %}\n    <input type=\"checkbox\" name=\"{{ field.name }}\" value=\"1\"{{ value ? ' checked' : '' }} class=\"w-4 h-4 text-green-800 border-gray-300 rounded focus:ring-green-500\">\n    {% elseif field.type == 'number' %}\n    <input type=\"number\" name=\"{{ field.name }}\" value=\"{{ value }}\" step=\"any\" class=\"w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5\">\n    {% else %}\n    <input type=\"text\" name=\"{{ field.name }}\" value=\"{{ value }}\" class=\"w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5\">\n    {% endif %}\n</div>\n{% endmacro %}"
+      },
+      "add_edit_view_usage": {
+        "note": "Controller passes `fields` (the schema array, options resolved for any select fields) and `data` (current values, empty for Add) to the view. See canonical_snippets.controller_twig_render for the base render pattern this extends.",
+        "code": "{% import 'partials/_form_field.twig' as forms %}\n<form method=\"POST\" action=\"/{{ module_route }}\">\n    <input type=\"hidden\" name=\"{{ csrf.keys.name }}\" value=\"{{ csrf.name }}\">\n    <input type=\"hidden\" name=\"{{ csrf.keys.value }}\" value=\"{{ csrf.value }}\">\n    {% for field in fields %}\n        {% if 'add' in field.show_in %}\n            {{ forms.input(field, data[field.name] ?? null) }}\n        {% endif %}\n    {% endfor %}\n    <button type=\"submit\" class=\"bg-green-800 text-white font-medium text-sm rounded-lg px-5 py-2.5 hover:bg-green-900 transition-colors\">Simpan</button>\n</form>"
+      },
+      "list_columns_usage": {
+        "note": "The SAME schema drives the list table's <thead>/<tbody> columns, filtered to fields where show_in contains 'list' — so a field added to the schema automatically appears in the list without touching the table markup.",
+        "code": "<thead class=\"text-[11px] text-gray-400 uppercase bg-gray-50\">\n    <tr>\n        {% for field in fields %}{% if 'list' in field.show_in %}<th class=\"px-6 py-4 font-bold\">{{ field.label }}</th>{% endif %}{% endfor %}\n        <th class=\"px-6 py-4 font-bold text-center\">Aksi</th>\n    </tr>\n</thead>\n<tbody class=\"divide-y divide-gray-100\">\n    {% for row in items %}\n    <tr class=\"hover:bg-gray-50 transition-colors\">\n        {% for field in fields %}{% if 'list' in field.show_in %}<td class=\"px-6 py-4\">{{ row[field.name] }}</td>{% endif %}{% endfor %}\n        <td class=\"px-6 py-4\"><!-- action buttons, see rules/ui_templates.md section 5 --></td>\n    </tr>\n    {% endfor %}\n</tbody>"
+      }
     }
   },
   "verified_gotchas": {
@@ -162,7 +186,15 @@
         "step": 3,
         "name": "eloquent_model",
         "target_path_pattern": "app/Models/{ModelName}.php",
-        "requirements": ["declare_strict_types", "use_soft_deletes", "fillable_array", "hidden_sensitive_fields", "casts_array", "relationships"],
+        "requirements": [
+          "declare_strict_types",
+          "use_soft_deletes",
+          "fillable_array",
+          "hidden_sensitive_fields",
+          "casts_array",
+          "relationships",
+          "ALSO_CREATE_AND_KEEP_IN_SYNC: app/FieldSchemas/{ModelName}FieldSchema.php — single source of truth for fields, feeds steps 4 and 9. See canonical_snippets.field_schema_pattern.field_schema_template. Unlike Hooks, this file IS meant to be edited again whenever a field is added/removed/renamed."
+        ],
         "owasp_ref": "A02, A03"
       },
       {
@@ -174,9 +206,10 @@
           "use_rakit_validation",
           "throw_exception_on_fails",
           "return_validated_array",
+          "DERIVE_RULES_FROM_FIELD_SCHEMA: do NOT hardcode the rules array — load it from app/FieldSchemas/{ModelName}FieldSchema.php so validation can never drift out of sync with the form/list. See canonical_snippets.field_schema_pattern.request_deriving_rules_from_schema.",
           "NO_STRING_RULE: Rakit\\Validation has NO 'string' rule (verified against vendor/rakit/validation/src/Rules — confirmed missing by actually running the app, see project_brain_protocol.known_issues_log pattern). NEVER write 'required|string|max:255'. A plain text field only needs 'required|max:255'; only add a type rule (array/integer/numeric/boolean) when the field really is that type."
         ],
-        "template": "<?php\ndeclare(strict_types=1);\nnamespace App\\Requests;\n\nuse Rakit\\Validation\\Validator;\nuse Exception;\n\nclass {Action}{ModelName}Request\n{\n    public static function validate(array $data): array\n    {\n        $validator = new Validator;\n        $validation = $validator->make($data, [\n            'nama' => 'required|max:255',\n        ]);\n        $validation->validate();\n        if ($validation->fails()) {\n            throw new Exception($validation->errors()->firstOfAll()[0]);\n        }\n        return $validation->getValidData();\n    }\n}",
+        "template": "<?php\ndeclare(strict_types=1);\nnamespace App\\Requests;\n\nuse Rakit\\Validation\\Validator;\nuse Exception;\n\nclass {Action}{ModelName}Request\n{\n    public static function validate(array $data): array\n    {\n        $fields = require dirname(__DIR__) . '/FieldSchemas/{ModelName}FieldSchema.php';\n\n        $rules = [];\n        foreach ($fields as $field) {\n            $rules[$field['name']] = $field['rules'];\n        }\n\n        $validator = new Validator();\n        $validation = $validator->make($data, $rules);\n        $validation->validate();\n        if ($validation->fails()) {\n            throw new Exception($validation->errors()->firstOfAll()[0]);\n        }\n        return $validation->getValidData();\n    }\n}",
         "owasp_ref": "A03, A08"
       },
       {
@@ -223,7 +256,8 @@
           "overflow_table_wrapper",
           "no_cdn_local_vendor_only",
           "sweetalert_confirm_delete",
-          "csrf_token_field_using_twig_globals"
+          "csrf_token_field_using_twig_globals",
+          "USE_FIELD_SCHEMA_FOR_LIST_AND_ADD_EDIT: list table columns and add/edit form inputs MUST be generated by looping app/FieldSchemas/{ModelName}FieldSchema.php through partials/_form_field.twig (add/edit) and a plain {% for field in fields %} loop (list columns) — see canonical_snippets.field_schema_pattern.add_edit_view_usage and list_columns_usage. NEVER hand-write an <input> or <td> for a field the schema already describes."
         ],
         "template_instructions": "Always include `<input type=\"hidden\" name=\"{{ csrf.keys.name }}\" value=\"{{ csrf.name }}\">` and `<input type=\"hidden\" name=\"{{ csrf.keys.value }}\" value=\"{{ csrf.value }}\">` in all POST forms. Delete actions MUST use the `js-confirm-delete` form class (handled by public/assets/vendor/js/app.js via SweetAlert2) instead of native `onsubmit=\"confirm(...)\"`. base.twig MUST also render `<meta name=\"csrf-name\" content=\"{{ csrf.name }}\">` and `<meta name=\"csrf-value\" content=\"{{ csrf.value }}\">` in <head>, plus a `<div id=\"app-loader\" class=\"hidden fixed inset-0 z-50 ...\">` element — both are read by app.js for the Axios CSRF header and the global loading overlay.",
         "owasp_ref": "A03, A06, A08"
