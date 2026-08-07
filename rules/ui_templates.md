@@ -66,6 +66,8 @@ Sidebar **BUKAN** file yang diedit setiap ada modul baru. Ia adalah renderer gen
 
 **Responsif (WAJIB)**: `<aside>` di bawah ini punya `id="sidebar"` + class `fixed lg:static ... -translate-x-full lg:translate-x-0` — artinya sembunyi total di layar HP (di luar viewport) dan baru muncul kalau tombol `#sidebar-toggle` di navbar di-tap (ditangani `app.js`, lihat section 1). Di layar besar (`lg:` ke atas) selalu tampil statis seperti biasa. Ketahuan jadi bug nyata dari tes 7B (2026-08-07) — sebelumnya `<aside>` tidak punya class responsif sama sekali.
 
+**PENTING — `top-16 bottom-0`, JANGAN `inset-y-0`**: navbar kita (section 2) **bukan** `fixed`, dia elemen flex biasa yang mengalir normal di atas. Kalau sidebar mobile pakai `inset-y-0` (dari atas viewport, y=0), dia akan menutupi navbar begitu dibuka — karena `fixed` mengabaikan posisi dokumen dan `z-30` sidebar lebih tinggi dari `z-10` navbar. Ketahuan jadi bug nyata dari tes 7B (2026-08-07): "navbar hilang, tidak muncul lagi meski window di-maximize". `top-16` (= tinggi navbar `h-16`) memastikan sidebar mobile selalu mulai TEPAT DI BAWAH navbar, tidak pernah menimpanya, apapun state toggle-nya.
+
 **Untuk menambah link nav modul baru: tambahkan SATU entri array di `app/menu.php` (lihat `mini_framework.json` → `canonical_snippets.menu_registry_pattern.menu_php_template`). JANGAN PERNAH edit HTML di `sidebar.twig` untuk ini** — satu-satunya bagian `sidebar.twig` yang boleh disentuh modul baru adalah menambah key baru ke dict `icons` di baris atas, kalau butuh ikon yang belum ada.
 
 ```html
@@ -77,7 +79,7 @@ Sidebar **BUKAN** file yang diedit setiap ada modul baru. Ia adalah renderer gen
     'dashboard': '<svg ...>...</svg>',
     'shield': '<svg ...>...</svg>'
 } %}
-<aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0 flex flex-col pt-4 pb-10 transform -translate-x-full lg:translate-x-0 transition-transform duration-200">
+<aside id="sidebar" class="fixed lg:static top-16 lg:top-auto bottom-0 lg:bottom-auto left-0 z-30 w-64 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0 flex flex-col pt-4 pb-10 transform -translate-x-full lg:translate-x-0 transition-transform duration-200">
     <nav class="flex-1 px-3 space-y-1.5">
         {% for item in menu %}
             {% if item.children is defined and item.children|length > 0 %}

@@ -103,6 +103,7 @@
       ]
     },
     "3_profile_management": {
+      "MANDATORY_NOT_OPTIONAL": "VERIFIED BY REAL 7B TESTING (2026-08-07): a fresh project's first login 404'd because GET/POST /profile/password had no route, controller method, or view — the AI had generated everything else but treated this endpoint list as descriptive rather than a hard checklist. This is NOT optional: bin/setup.php always seeds the superadmin with must_change_password=1, and AuthMiddleware always redirects there on first login (see canonical_snippets.starter_middleware_pattern.auth_middleware_template) — so /profile/password is reachable on literally the FIRST successful login of every new project. Every endpoint listed below MUST have a real route + controller method + view before the boilerplate is considered done, not just the ones a developer happens to click on first.",
       "endpoints": [
         "GET /profile",
         "POST /profile",
@@ -125,10 +126,12 @@
   },
   "index_php_strict_rules": {
     "session_handling": "Always start session using `$container->get(\\Odan\\Session\\SessionInterface::class)->start();` before adding middleware. NEVER use raw `session_start();`.",
-    "middleware_execution_order": "To avoid CSRF parsing bugs, middleware MUST be added in this exact order (which executes them correctly in LIFO): 1) CsrfMiddleware, 2) Slim\\Csrf\\Guard, 3) RoutingMiddleware, 4) BodyParsingMiddleware, 5) ErrorMiddleware."
+    "middleware_execution_order": "To avoid CSRF parsing bugs, middleware MUST be added in this exact order (which executes them correctly in LIFO): 1) CsrfMiddleware, 2) Slim\\Csrf\\Guard, 3) RoutingMiddleware, 4) BodyParsingMiddleware, 5) ErrorMiddleware.",
+    "DO_NOT_WRITE_FROM_THESE_RULES_ALONE": "VERIFIED BY REAL 7B TESTING (2026-08-07): an AI following only the two rules above (without a literal file to copy) got public/index.php wrong three separate times in a row before landing on the working version. These rules explain WHY the file looks the way it does — the actual file to write is mini_framework.json canonical_snippets.public_index_php_template, copied verbatim."
   },
   "boilerplate_init_command": {
     "description": "How AI initializes a new project starter skeleton",
-    "rule": "When starting a NEW project, AI automatically generates the core directory structure, bin/setup.php, and prebuilt Auth, Profile, Layout, Navbar, and Dashboard files. AI MUST ALSO create and run a script (e.g., bin/download_assets.php) to download all required frontend libraries (Tailwind, SweetAlert, Axios, etc.) into public/assets/vendor/ to strictly comply with the NO-CDN policy."
+    "rule": "When starting a NEW project, AI automatically generates the core directory structure, bin/setup.php, and prebuilt Auth, Profile, Layout, Navbar, and Dashboard files, using the literal composer.json from mini_framework.json canonical_snippets.composer_json_template and the literal public/index.php from canonical_snippets.public_index_php_template.",
+    "CONTRADICTS_NO_EXTERNAL_FETCH_DO_NOT_FOLLOW": "An earlier version of this rule told the AI to 'create and run a script to download frontend libraries into public/assets/vendor/' — that directly contradicts mini_framework.json identity.rules.NO_EXTERNAL_FETCH and is now WRONG. All frontend vendor assets (Tailwind, SweetAlert2, Choices.js, Flatpickr, Axios, Flowbite, Inter font, app.js) are ALREADY PRE-PROVISIONED locally — see the 'status' note under public.assets.vendor below. NEVER write or run a download script for them."
   }
 }
