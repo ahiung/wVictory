@@ -3,19 +3,22 @@
 Panduan *layout* ini **WAJIB** digunakan oleh AI saat melakukan *scaffolding* tampilan aplikasi untuk memastikan konsistensi UI. UI ini didesain menggunakan **Tailwind CSS**.
 
 ## 1. Base Layout (`base.twig`)
-Layout utama terdiri dari Navbar lebar penuh di paling atas, dan area konten di bawahnya yang terbagi menjadi Sidebar (kiri) dan Main Content (kanan).
+Layout utama terdiri dari Navbar lebar penuh di paling atas, dan area konten di bawahnya yang terbagi menjadi Sidebar (kiri) dan Main Content (kanan). **WAJIB responsif** — App Shell (navbar+sidebar) yang tidak menyesuaikan di lebar layar HP ketahuan jadi bug nyata dari tes 7B (2026-08-07). `#sidebar-backdrop` di bawah ini WAJIB ada — itu overlay gelap yang muncul di HP saat sidebar dibuka (tap di luar sidebar untuk menutup), ditangani `initSidebarToggle()` di `app.js` (sudah pre-provisioned, tidak perlu ditulis ulang).
 
 ```html
 <body class="bg-gray-50 font-sans text-gray-900 antialiased">
     <div class="flex flex-col h-screen overflow-hidden">
         <!-- Top Navbar -->
         {% include 'partials/navbar.twig' %}
-        
+
         <!-- Bottom Layout: Sidebar & Content -->
-        <div class="flex flex-1 overflow-hidden">
+        <div class="flex flex-1 overflow-hidden relative">
+            <!-- Mobile-only backdrop, tap to close sidebar (lihat app.js initSidebarToggle) -->
+            <div id="sidebar-backdrop" class="hidden fixed inset-0 z-20 bg-gray-900/50 lg:hidden"></div>
+
             <!-- Sidebar -->
             {% include 'partials/sidebar.twig' %}
-            
+
             <!-- Main Content -->
             <div class="flex-1 overflow-y-auto">
                 <main class="p-4 md:p-6 lg:p-8">
@@ -28,12 +31,15 @@ Layout utama terdiri dari Navbar lebar penuh di paling atas, dan area konten di 
 ```
 
 ## 2. Navbar (`navbar.twig`)
-Navbar berisi Logo di kiri dan Avatar Inisial (menggunakan *filter* Twig `initials`) di kanan. Aksen utama menggunakan `green-800`.
+Navbar berisi tombol hamburger (khusus HP, `lg:hidden`) + Logo di kiri, dan Avatar Inisial (menggunakan *filter* Twig `initials`) di kanan. Aksen utama menggunakan `green-800`. Tombol `#sidebar-toggle` **WAJIB ada** — tanpa ini sidebar tidak akan pernah bisa dibuka di layar HP karena `sidebar.twig` sengaja disembunyikan (`-translate-x-full`) di bawah `lg:`.
 
 ```html
 <header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 z-10 relative">
-    <!-- Left: Logo -->
+    <!-- Left: Hamburger (mobile only) + Logo -->
     <div class="flex items-center gap-3">
+        <button id="sidebar-toggle" type="button" class="lg:hidden p-2 -ml-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg" aria-controls="sidebar" aria-expanded="false">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
         <div class="bg-green-800 text-white rounded p-1.5 flex items-center justify-center h-8 w-8">
             <!-- SVG Logo -->
         </div>
@@ -58,6 +64,8 @@ Referensi struktur: **Flowbite Admin Dashboard** (github.com/themesberg/flowbite
 
 Sidebar **BUKAN** file yang diedit setiap ada modul baru. Ia adalah renderer generik yang loop atas Twig global `menu` (dibangun oleh `App\Support\MenuBuilder` dari `app/menu.php`, di-inject di `AuthMiddleware`). Menu *accordion* (seperti Sistem Otorisasi) otomatis muncul kalau item punya `children`, memakai mekanisme collapse **native Flowbite** (`data-collapse-toggle`, dari `flowbite.min.js` yang sudah dimuat) — **BUKAN** `<details>`/`<summary>` HTML5 (pola versi sebelumnya, sudah usang).
 
+**Responsif (WAJIB)**: `<aside>` di bawah ini punya `id="sidebar"` + class `fixed lg:static ... -translate-x-full lg:translate-x-0` — artinya sembunyi total di layar HP (di luar viewport) dan baru muncul kalau tombol `#sidebar-toggle` di navbar di-tap (ditangani `app.js`, lihat section 1). Di layar besar (`lg:` ke atas) selalu tampil statis seperti biasa. Ketahuan jadi bug nyata dari tes 7B (2026-08-07) — sebelumnya `<aside>` tidak punya class responsif sama sekali.
+
 **Untuk menambah link nav modul baru: tambahkan SATU entri array di `app/menu.php` (lihat `mini_framework.json` → `canonical_snippets.menu_registry_pattern.menu_php_template`). JANGAN PERNAH edit HTML di `sidebar.twig` untuk ini** — satu-satunya bagian `sidebar.twig` yang boleh disentuh modul baru adalah menambah key baru ke dict `icons` di baris atas, kalau butuh ikon yang belum ada.
 
 ```html
@@ -69,7 +77,7 @@ Sidebar **BUKAN** file yang diedit setiap ada modul baru. Ia adalah renderer gen
     'dashboard': '<svg ...>...</svg>',
     'shield': '<svg ...>...</svg>'
 } %}
-<aside class="w-64 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0 flex flex-col pt-4 pb-10">
+<aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0 flex flex-col pt-4 pb-10 transform -translate-x-full lg:translate-x-0 transition-transform duration-200">
     <nav class="flex-1 px-3 space-y-1.5">
         {% for item in menu %}
             {% if item.children is defined and item.children|length > 0 %}
@@ -142,6 +150,8 @@ Digunakan untuk metrik KPI berupa grid berjajar.
 ## 5. CRUD List / Data Table Template
 Digunakan untuk halaman indeks/tabel data pada setiap modul CRUD (seperti Master Data, Daftar Transaksi, dsb). Elemen *hardcoded* harus diganti dengan sintaks Twig (misal `{{ items.currentPage }}`).
 
+**WAJIB**: tombol Tambah dan ikon aksi Edit/Hapus per baris **HARUS** dibungkus `{% if can('{module}.xxx') %}` — kalau tidak, user yang cuma diberi permission `{module}.delete` (misal) tetap akan melihat tombol Tambah yang seharusnya tidak boleh dia pakai (ketahuan dari tes 7B nyata, 2026-08-07). Jangan andalkan RBAC di route saja (route cuma cegah akses langsung URL-nya) — tombol yang seharusnya tidak boleh dipakai tetap harus disembunyikan dari UI.
+
 ```html
 <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
     <!-- Header Modul & Tombol Aksi -->
@@ -154,9 +164,11 @@ Digunakan untuk halaman indeks/tabel data pada setiap modul CRUD (seperti Master
             <button type="button" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                 <svg class="w-4 h-4">...</svg> Export CSV
             </button>
+            {% if can('{module}.create') %}
             <a href="/{{ module_route }}/create" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-800 bg-white border border-gray-300 rounded-lg hover:bg-green-50 hover:text-green-800 transition-colors shadow-sm">
                 <svg class="w-4 h-4">...</svg> Tambah {{ entity_name }}
             </a>
+            {% endif %}
         </div>
     </div>
 
@@ -194,13 +206,17 @@ Digunakan untuk halaman indeks/tabel data pada setiap modul CRUD (seperti Master
                     <td class="px-6 py-4">
                         <div class="flex items-center justify-center gap-3">
                             <a href="#" class="text-gray-400 hover:text-green-700" title="Detail"><svg class="w-4 h-4">...</svg></a>
+                            {% if can('{module}.edit') %}
                             <a href="#" class="text-gray-400 hover:text-blue-600" title="Edit"><svg class="w-4 h-4">...</svg></a>
+                            {% endif %}
+                            {% if can('{module}.delete') %}
                             <!-- JANGAN pakai onsubmit="confirm(...)" native — requirement step 9 (sweetalert_confirm_delete) wajib pakai SweetAlert2 via app.js. Kelas js-confirm-delete di-intercept otomatis oleh app.js. -->
                             <form action="#" method="POST" class="inline js-confirm-delete" data-confirm-title="Hapus data?" data-confirm-text="Data yang dihapus tidak dapat dikembalikan.">
                                 <input type="hidden" name="{{ csrf.keys.name }}" value="{{ csrf.name }}">
                                 <input type="hidden" name="{{ csrf.keys.value }}" value="{{ csrf.value }}">
                                 <button type="submit" class="text-gray-400 hover:text-red-600" title="Hapus"><svg class="w-4 h-4">...</svg></button>
                             </form>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>

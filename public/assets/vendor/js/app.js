@@ -7,6 +7,9 @@
  *   <meta name="csrf-name"  content="{{ csrf.name }}">
  *   <meta name="csrf-value" content="{{ csrf.value }}">
  *   <div id="app-loader" class="hidden fixed inset-0 z-50 ...">...</div>
+ *   <button id="sidebar-toggle"> (in navbar.twig, lg:hidden)
+ *   <aside id="sidebar"> (sidebar.twig, starts off-screen on mobile via -translate-x-full)
+ *   <div id="sidebar-backdrop" class="hidden fixed inset-0 z-20 ... lg:hidden"> (base.twig)
  *
  * Form conventions used across all Twig views:
  *   - <form method="POST"> shows the loader automatically on submit.
@@ -108,6 +111,36 @@
         });
     });
 
+    // --- Mobile sidebar toggle ---------------------------------------------------
+    function initSidebarToggle() {
+        var toggle = document.getElementById('sidebar-toggle');
+        var sidebar = document.getElementById('sidebar');
+        var backdrop = document.getElementById('sidebar-backdrop');
+        if (!toggle || !sidebar) return;
+
+        function openSidebar() {
+            sidebar.classList.remove('-translate-x-full');
+            if (backdrop) backdrop.classList.remove('hidden');
+            toggle.setAttribute('aria-expanded', 'true');
+        }
+
+        function closeSidebar() {
+            sidebar.classList.add('-translate-x-full');
+            if (backdrop) backdrop.classList.add('hidden');
+            toggle.setAttribute('aria-expanded', 'false');
+        }
+
+        toggle.addEventListener('click', function () {
+            if (sidebar.classList.contains('-translate-x-full')) {
+                openSidebar();
+            } else {
+                closeSidebar();
+            }
+        });
+
+        if (backdrop) backdrop.addEventListener('click', closeSidebar);
+    }
+
     // --- Component auto-init -----------------------------------------------------
     function initComponents() {
         if (window.flatpickr) {
@@ -126,5 +159,8 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', initComponents);
+    document.addEventListener('DOMContentLoaded', function () {
+        initComponents();
+        initSidebarToggle();
+    });
 })();
