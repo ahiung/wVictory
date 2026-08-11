@@ -15,6 +15,6 @@
 </FilesMatch>
 # Matched by filename (not by *.json/*.md glob) so this does not cascade down
 # into public/ and block a future manifest.json or similar.
-<FilesMatch "^(mini_framework|starter_boilerplate_blueprint|PROJECT_BRAIN)\.json$|^(AGENTS|CLAUDE|GEMINI)\.md$">
+<FilesMatch "^(mini_framework|starter_boilerplate_blueprint|PROJECT_BRAIN)\.json$|^(AGENTS|CLAUDE|GEMINI)\.md$|\.py$">
     Require all denied
 </FilesMatch>
